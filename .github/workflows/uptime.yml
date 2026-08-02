@@ -1,0 +1,36 @@
+name: Uptime
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Health endpoints
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - environment: preview
+            url: ${{ vars.PREVIEW_HEALTHCHECK_URL }}
+          - environment: beta
+            url: ${{ vars.BETA_HEALTHCHECK_URL }}
+          - environment: production
+            url: ${{ vars.PRODUCTION_HEALTHCHECK_URL }}
+    steps:
+      - name: Confirm endpoint configured
+        env:
+          HEALTH_URL: ${{ matrix.url }}
+        run: test -n "$HEALTH_URL"
+      - name: Check endpoint
+        env:
+          HEALTH_URL: ${{ matrix.url }}
+        run: |
+          response="$(curl --fail --silent --show-error --location --max-time 15 "$HEALTH_URL")"
+          node -e 'const body=JSON.parse(process.argv[1]); if(body.status!=="ok"||body.service!=="anchor") process.exit(1)' "$response"

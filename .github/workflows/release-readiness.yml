@@ -1,0 +1,56 @@
+name: Release readiness
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_environment:
+        description: Controlled environment
+        required: true
+        type: choice
+        options: [beta, production]
+      release_record:
+        description: Repository path to the approved JSON release record
+        required: true
+        default: governance/releases/anchor-v7-beta-rc1.json
+
+permissions:
+  contents: read
+
+jobs:
+  approve-release:
+    name: Approved release record
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.target_environment }}
+    timeout-minutes: 20
+    env:
+      NEXT_PUBLIC_ANCHOR_ENV: ${{ inputs.target_environment }}
+      NEXT_PUBLIC_RELEASE_SHA: ${{ github.sha }}
+      NEXT_PUBLIC_SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm run validate:config -- --environment "${{ inputs.target_environment }}"
+      - run: npm run validate:release -- "${{ inputs.release_record }}" --require-approved
+      - name: Verify release record targets this commit and environment
+        env:
+          RECORD: ${{ inputs.release_record }}
+          TARGET: ${{ inputs.target_environment }}
+          COMMIT: ${{ github.sha }}
+        run: node scripts/verify-release-target.mjs "$RECORD" "$TARGET" "$COMMIT"
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm audit --omit=dev --audit-level=high
+      - run: npm run test:rollback
+      - uses: actions/upload-artifact@v4
+        with:
+          name: approved-anchor-${{ inputs.target_environment }}-${{ github.sha }}
+          path: |
+            dist
+            ${{ inputs.release_record }}
+          if-no-files-found: error
+          retention-days: 90

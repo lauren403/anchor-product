@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "release_id": "anchor-v7-beta-rc1",
+  "target_environment": "beta",
+  "code": {
+    "repository": "PENDING_GITHUB_REPOSITORY",
+    "commit": "PENDING",
+    "workflow_run": "PENDING"
+  },
+  "content": {
+    "taxonomy_version": "anchor-moments-v1",
+    "support_library_version": "anchor-supports-v1",
+    "meal_library_version": "anchor-meals-v1",
+    "ecosystem_contract_version": "anchor-ecosystem-v1"
+  },
+  "governance": {
+    "approvals": [
+      { "domain": "clinical", "status": "pending", "reviewer": "", "approved_at": "", "evidence_ref": "" },
+      { "domain": "nutrition", "status": "pending", "reviewer": "", "approved_at": "", "evidence_ref": "" },
+      { "domain": "privacy", "status": "pending", "reviewer": "", "approved_at": "", "evidence_ref": "" },
+      { "domain": "first_nations", "status": "pending", "reviewer": "", "approved_at": "", "evidence_ref": "" },
+      { "domain": "accessibility", "status": "pending", "reviewer": "", "approved_at": "", "evidence_ref": "" },
+      { "domain": "security", "status": "pending", "reviewer": "", "approved_at": "", "evidence_ref": "" }
+    ]
+  },
+  "verification": {
+    "quality_workflow": "pending",
+    "dependency_review": "pending",
+    "codeql": "pending",
+    "rollback_drill": "pending",
+    "uptime_check": "pending",
+    "monitoring_smoke_test": "pending"
+  },
+  "risk": {
+    "known_issues": [],
+    "rollback_ref": "PENDING_LAST_KNOWN_GOOD_RELEASE",
+    "rollback_owner": "PENDING"
+  },
+  "decision": {
+    "status": "draft",
+    "release_owner": "",
+    "approved_at": "",
+    "notes": "This draft cannot pass the approved release workflow until every approval and operational check is evidenced."
+  }
+}

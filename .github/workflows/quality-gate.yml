@@ -1,0 +1,44 @@
+name: Quality gate
+
+on:
+  pull_request:
+  push:
+    branches: [main, beta]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: quality-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality-gate:
+    name: Anchor quality gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      NEXT_PUBLIC_ANCHOR_ENV: preview
+      NEXT_PUBLIC_RELEASE_SHA: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm run validate:config -- --environment preview
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run test:unit
+      - run: npm run build
+      - run: npm run test:rendered
+      - run: npm audit --omit=dev --audit-level=high
+      - run: npm run test:rollback
+      - uses: actions/upload-artifact@v4
+        with:
+          name: anchor-${{ github.sha }}
+          path: dist
+          if-no-files-found: error
+          retention-days: 30
