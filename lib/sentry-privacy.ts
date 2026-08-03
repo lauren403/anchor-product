@@ -1,13 +1,18 @@
-const prohibitedKeys = /^(?:moment|barrier|capacity|outcome|localStorage|sessionStorage|email|name|user|identity)$/i;
-
 type ScrubbableEvent = {
   breadcrumbs?: unknown;
   contexts?: unknown;
   extra?: unknown;
+  exception?: { values?: Array<{ type?: string; value?: string; stacktrace?: unknown }> };
+  fingerprint?: unknown;
+  logentry?: unknown;
+  message?: string;
   request?: unknown;
+  server_name?: string;
+  transaction?: string;
+  transaction_info?: unknown;
   user?: unknown;
   tags?: Record<string, unknown>;
-  spans?: Array<{ data?: unknown; tags?: unknown }>;
+  spans?: Array<{ data?: unknown; description?: string; tags?: unknown }>;
 };
 
 /**
@@ -20,15 +25,29 @@ export function scrubSentryEvent<T extends ScrubbableEvent>(event: T): T {
   delete event.breadcrumbs;
   delete event.contexts;
   delete event.extra;
+  delete event.fingerprint;
+  delete event.logentry;
+  delete event.message;
+  delete event.server_name;
+  delete event.tags;
+  delete event.transaction_info;
 
-  if (event.tags) {
-    for (const key of Object.keys(event.tags)) {
-      if (prohibitedKeys.test(key)) delete event.tags[key];
+  // Error messages can contain form values, selections or URLs. Retain the
+  // exception class and stack frames needed for diagnosis, but never its value.
+  for (const exception of event.exception?.values ?? []) {
+    delete exception.value;
+    if (!exception.type) {
+      exception.type = "Error";
     }
   }
 
+  // Transaction and span descriptions can contain raw URLs or dynamic values.
+  // Keep timing and operation metadata, but use a stable non-identifying label.
+  if (event.transaction) event.transaction = "anchor-route";
+
   for (const span of event.spans ?? []) {
     delete span.data;
+    delete span.description;
     delete span.tags;
   }
 
