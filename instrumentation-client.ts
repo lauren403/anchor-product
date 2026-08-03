@@ -4,7 +4,6 @@ import { privacySafeSentryOptions } from "@/lib/sentry-privacy";
 Sentry.init({
   dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
   ...privacySafeSentryOptions(),
-  integrations: [],
 });
 
 export const onRouterTransitionStart = Sentry.captureRouterTransitionStart;
