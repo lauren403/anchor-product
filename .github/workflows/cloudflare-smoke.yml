@@ -44,13 +44,20 @@ jobs:
             test -n "${!name}" || { echo "::error::Missing required GitHub secret: $name"; exit 1; }
           done
 
+      - name: Check out deployment controls
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
       - name: Check out exact reviewed release
         uses: actions/checkout@v5
         with:
           ref: ${{ inputs.release_sha }}
+          path: release
           persist-credentials: false
 
       - name: Verify immutable source identity
+        working-directory: release
         shell: bash
         run: |
           set -euo pipefail
@@ -60,13 +67,16 @@ jobs:
 
       - uses: actions/setup-node@v5
         with:
-          node-version-file: .nvmrc
+          node-version-file: release/.nvmrc
           cache: npm
+          cache-dependency-path: release/package-lock.json
 
       - name: Install locked dependencies
+        working-directory: release
         run: npm ci --ignore-scripts
 
       - name: Validate and test release
+        working-directory: release
         run: |
           npm run validate:config -- --environment preview
           npm run lint
@@ -81,13 +91,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if find dist -type f -name '*.map' -print -quit | grep -q .; then
+          if find release/dist -type f -name '*.map' -print -quit | grep -q .; then
             echo "::error::Source maps remain in the deploy artifact."
             exit 1
           fi
 
       - name: Validate Cloudflare package without deploying
-        run: npx wrangler deploy --dry-run --config wrangler.smoke.jsonc
+        run: ./release/node_modules/.bin/wrangler deploy --dry-run --config wrangler.smoke.jsonc
 
       - name: Deploy reviewed release
         id: deploy
@@ -131,7 +141,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          npx wrangler versions list --name anchor-private-smoke --json > cloudflare-versions.json
+          ./release/node_modules/.bin/wrangler versions list --name anchor-private-smoke --json > cloudflare-versions.json
           test -s cloudflare-versions.json
 
       - name: Upload acceptance evidence
