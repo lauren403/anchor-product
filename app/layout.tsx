@@ -5,7 +5,6 @@ import "@fontsource/dm-sans/400.css";
 import "@fontsource/dm-sans/500.css";
 import "@fontsource/dm-sans/600.css";
 import "./globals.css";
-import { MonitoringBoundary } from "@/components/operations/MonitoringBoundary";
 
 export const metadata: Metadata = {
   title: "Anchor · support for the ADHD day you are actually having",
@@ -27,7 +26,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="en-AU">
       <body>
-        <MonitoringBoundary>{children}</MonitoringBoundary>
+        {children}
       </body>
     </html>
   );

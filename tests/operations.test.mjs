@@ -10,11 +10,24 @@ test("health endpoint exposes no user data or secrets", async () => {
 });
 
 test("monitoring strips identity, breadcrumbs, contexts, query and fragment data", async () => {
-  const source = await readFile("components/operations/MonitoringBoundary.tsx", "utf8");
-  for (const expected of ["url.search = \"\"", "url.hash = \"\"", "delete event.user", "delete event.breadcrumbs", "sendDefaultPii: false"]) {
+  const source = await readFile("lib/sentry-privacy.ts", "utf8");
+  for (const expected of ["delete event.user", "delete event.request", "delete event.breadcrumbs", "delete event.contexts", "sendDefaultPii: false", "enableLogs: false"]) {
     assert.ok(source.includes(expected), `Missing monitoring privacy control: ${expected}`);
   }
-  assert.doesNotMatch(source, /replayIntegration|feedbackIntegration/i);
+  assert.doesNotMatch(source, /replayIntegration|feedbackIntegration|localStorage\.getItem|sessionStorage\.getItem/i);
+});
+
+test("official Sentry SDK covers browser, Node.js and Edge runtimes", async () => {
+  const [client, instrumentation, server, edge] = await Promise.all([
+    readFile("instrumentation-client.ts", "utf8"),
+    readFile("instrumentation.ts", "utf8"),
+    readFile("sentry.server.config.ts", "utf8"),
+    readFile("sentry.edge.config.ts", "utf8"),
+  ]);
+  assert.match(client, /@sentry\/nextjs/);
+  assert.match(instrumentation, /captureRequestError/);
+  assert.match(server, /includeLocalVariables: false/);
+  assert.match(edge, /privacySafeSentryOptions/);
 });
 
 test("release ledger covers code, content, approvals, rollback and decision", async () => {
