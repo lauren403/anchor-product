@@ -1,0 +1,143 @@
+name: Cloudflare smoke deployment
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_sha:
+        description: Exact reviewed Anchor commit to deploy
+        required: true
+        default: "50323c8633dde9b5000faff2f940fa9d2aa97518"
+      confirmation:
+        description: Type DEPLOY_SYNTHETIC_SMOKE_ONLY
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: anchor-cloudflare-private-smoke
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy isolated Cloudflare smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: preview
+    env:
+      RELEASE_SHA: ${{ inputs.release_sha }}
+      NEXT_PUBLIC_ANCHOR_ENV: preview
+      NEXT_PUBLIC_RELEASE_SHA: ${{ inputs.release_sha }}
+      NEXT_PUBLIC_SENTRY_DSN: ${{ secrets.NEXT_PUBLIC_SENTRY_DSN }}
+      SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+      SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+      SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
+      SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+    steps:
+      - name: Enforce controlled smoke-test boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${{ inputs.confirmation }}" = "DEPLOY_SYNTHETIC_SMOKE_ONLY"
+          test "$RELEASE_SHA" = "50323c8633dde9b5000faff2f940fa9d2aa97518"
+          for name in NEXT_PUBLIC_SENTRY_DSN SENTRY_DSN SENTRY_ORG SENTRY_PROJECT SENTRY_AUTH_TOKEN; do
+            test -n "${!name}" || { echo "::error::Missing required GitHub secret: $name"; exit 1; }
+          done
+
+      - name: Check out exact reviewed release
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.release_sha }}
+          persist-credentials: false
+
+      - name: Verify immutable source identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$RELEASE_SHA"
+          git diff --exit-code
+          git diff --cached --exit-code
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Validate and test release
+        run: |
+          npm run validate:config -- --environment preview
+          npm run lint
+          npm run typecheck
+          npm run test:unit
+          npm run build
+          npm run test:rendered
+          npm audit --omit=dev --audit-level=high
+          npm run test:rollback
+
+      - name: Confirm source maps were uploaded and removed locally
+        shell: bash
+        run: |
+          set -euo pipefail
+          if find dist -type f -name '*.map' -print -quit | grep -q .; then
+            echo "::error::Source maps remain in the deploy artifact."
+            exit 1
+          fi
+
+      - name: Validate Cloudflare package without deploying
+        run: npx wrangler deploy --dry-run --config wrangler.smoke.jsonc
+
+      - name: Deploy reviewed release
+        id: deploy
+        uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          wranglerVersion: "4.118.0"
+          command: deploy --config wrangler.smoke.jsonc
+          secrets: |
+            SENTRY_DSN
+        env:
+          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+
+      - name: Verify deployed health contract
+        env:
+          DEPLOYMENT_URL: ${{ steps.deploy.outputs.deployment-url }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$DEPLOYMENT_URL"
+          health_url="${DEPLOYMENT_URL%/}/api/health"
+          response="$(curl --fail --silent --show-error --location --retry 5 --retry-delay 2 --max-time 20 "$health_url")"
+          node - "$response" "$RELEASE_SHA" <<'NODE'
+          const [bodyText, expectedRelease] = process.argv.slice(2);
+          const body = JSON.parse(bodyText);
+          if (
+            body.status !== "ok" ||
+            body.service !== "anchor" ||
+            body.environment !== "preview" ||
+            body.release !== expectedRelease
+          ) {
+            throw new Error("Deployed health contract does not match the reviewed release.");
+          }
+          NODE
+
+      - name: Capture Cloudflare version evidence
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx wrangler versions list --name anchor-private-smoke --json > cloudflare-versions.json
+          test -s cloudflare-versions.json
+
+      - name: Upload acceptance evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: anchor-cloudflare-smoke-${{ inputs.release_sha }}
+          path: cloudflare-versions.json
+          if-no-files-found: error
+          retention-days: 30
