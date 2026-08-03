@@ -8,8 +8,9 @@ on:
     - cron: "17 2 * * 1"
 
 permissions:
+  actions: read
   contents: read
-  security-events: write
+  security-events: read
 
 jobs:
   analyse:
@@ -24,3 +25,7 @@ jobs:
       - uses: github/codeql-action/analyze@v4
         with:
           category: /language:javascript-typescript
+          # This private personal repository does not have GitHub code-scanning
+          # upload enabled. CodeQL still builds the database and runs all queries;
+          # disabling only SARIF upload prevents a plan-level API error.
+          upload: never

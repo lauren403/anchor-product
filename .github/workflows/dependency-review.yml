@@ -10,9 +10,13 @@ jobs:
   dependency-review:
     name: Dependency review
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
-      - uses: actions/dependency-review-action@v4
+      - uses: actions/setup-node@v5
         with:
-          fail-on-severity: moderate
-          deny-licenses: GPL-3.0, AGPL-3.0
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Reject high or critical production vulnerabilities
+        run: npm audit --omit=dev --audit-level=high

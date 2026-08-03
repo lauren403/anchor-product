@@ -1,7 +1,8 @@
 import vinext from "vinext";
 import { defineConfig } from "vite";
-import hostingConfig from "./.openai/hosting.json";
-import { sites } from "./build/sites-vite-plugin";
+import { sentryVitePlugin } from "@sentry/vite-plugin";
+import hostingConfig from "./.openai/hosting.json" with { type: "json" };
+import { sites } from "./build/sites-vite-plugin.ts";
 
 const SITE_CREATOR_PLACEHOLDER_DATABASE_ID =
   "00000000-0000-4000-8000-000000000000";
@@ -42,8 +43,18 @@ export default defineConfig(async () => {
 
   // Wrangler snapshots its log path while the Cloudflare plugin is imported.
   const { cloudflare } = await import("@cloudflare/vite-plugin");
+  const sentryBuildConfigured = Boolean(
+    process.env.SENTRY_AUTH_TOKEN &&
+      process.env.SENTRY_ORG &&
+      process.env.SENTRY_PROJECT,
+  );
 
   return {
+    build: {
+      // Hidden maps retain Sentry symbolication without adding sourceMappingURL
+      // references to browser assets. The upload plugin removes maps afterward.
+      sourcemap: sentryBuildConfigured ? ("hidden" as const) : false,
+    },
     server: {
       host: "0.0.0.0",
       allowedHosts: ["terminal.local"],
@@ -59,6 +70,25 @@ export default defineConfig(async () => {
         inspectorPort: false,
         config: localBindingConfig,
       }),
+      ...(sentryBuildConfigured
+        ? [
+            sentryVitePlugin({
+              authToken: process.env.SENTRY_AUTH_TOKEN,
+              org: process.env.SENTRY_ORG,
+              project: process.env.SENTRY_PROJECT,
+              release: {
+                name:
+                  process.env.NEXT_PUBLIC_RELEASE_SHA ??
+                  process.env.RELEASE_SHA ??
+                  "development",
+              },
+              sourcemaps: {
+                filesToDeleteAfterUpload: ["./dist/**/*.map"],
+              },
+              silent: true,
+            }),
+          ]
+        : []),
     ],
   };
 });

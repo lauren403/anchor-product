@@ -22,18 +22,22 @@ if (release && !/^(?:[a-f0-9]{7,40}|local-preview|development)$/i.test(release))
 }
 
 const sentryDsn = process.env.NEXT_PUBLIC_SENTRY_DSN;
-if (["beta", "production"].includes(environment) && !sentryDsn) {
+const serverSentryDsn = process.env.SENTRY_DSN;
+if (["beta", "production"].includes(environment) && (!sentryDsn || !serverSentryDsn)) {
+  errors.push("NEXT_PUBLIC_SENTRY_DSN and SENTRY_DSN are required for beta and production.");
+} else if (["beta", "production"].includes(environment) && !sentryDsn) {
   errors.push("NEXT_PUBLIC_SENTRY_DSN is required for beta and production.");
 }
 
-if (sentryDsn) {
+for (const [name, dsn] of [["NEXT_PUBLIC_SENTRY_DSN", sentryDsn], ["SENTRY_DSN", serverSentryDsn]]) {
+  if (!dsn) continue;
   try {
-    const url = new URL(sentryDsn);
+    const url = new URL(dsn);
     if (url.protocol !== "https:" || !url.hostname.endsWith("sentry.io")) {
-      errors.push("NEXT_PUBLIC_SENTRY_DSN must be an HTTPS sentry.io DSN.");
+      errors.push(`${name} must be an HTTPS sentry.io DSN.`);
     }
   } catch {
-    errors.push("NEXT_PUBLIC_SENTRY_DSN must be a valid URL.");
+    errors.push(`${name} must be a valid URL.`);
   }
 }
 
