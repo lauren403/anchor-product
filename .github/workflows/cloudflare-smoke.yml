@@ -117,6 +117,9 @@ jobs:
           response_file="$RUNNER_TEMP/cloudflare-subdomain-response.json"
           trap 'rm -f "$response_file"' EXIT
           http_status="$(curl --silent --show-error --output "$response_file" --write-out '%{http_code}' --request PUT             --header "Authorization: Bearer $CLOUDFLARE_API_TOKEN"             --header "Content-Type: application/json"             --data '{"subdomain":"mobmind-anchor"}'             "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/subdomain")"
+          if test "$http_status" = "409"; then
+            http_status="$(curl --silent --show-error --output "$response_file" --write-out '%{http_code}'               --header "Authorization: Bearer $CLOUDFLARE_API_TOKEN"               "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/subdomain")"
+          fi
           test "$http_status" = "200" || { echo "::error::Cloudflare rejected workers.dev subdomain registration (HTTP $http_status)."; exit 1; }
           node - "$response_file" <<'NODE'
           const response = require(process.argv[2]);
