@@ -73,7 +73,7 @@ jobs:
           trap 'rm -f "$temporary_vars"' EXIT
           printf '%s\n' 'SENTRY_DSN="https://public@example.ingest.sentry.io/1"' 'ANCHOR_SMOKE_TOKEN="type-generation-placeholder"' > "$temporary_vars"
           ./node_modules/.bin/wrangler types smoke/worker-configuration.d.ts --config wrangler.smoke.jsonc --include-runtime=false --env-file "$temporary_vars"
-          sed -E -i '1s# --env-file=[^ ]+##' smoke/worker-configuration.d.ts
+          sed -E -i 's# --env-file=[^ ]+##' smoke/worker-configuration.d.ts
           git diff --exit-code -- smoke/worker-configuration.d.ts
 
       - name: Validate, test and build reviewed release
