@@ -16,6 +16,7 @@ function unavailable(): Response {
 export async function POST(request: Request): Promise<Response> {
   if (
     process.env.NEXT_PUBLIC_ANCHOR_ENV !== "preview" ||
+    process.env.ANCHOR_SMOKE_ACCEPTANCE_ENABLED !== "true" ||
     request.headers.get("x-anchor-acceptance-gate") !== "verified"
   ) {
     return unavailable();
