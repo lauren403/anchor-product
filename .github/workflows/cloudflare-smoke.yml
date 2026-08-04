@@ -173,14 +173,23 @@ jobs:
           test -n "$DEPLOYMENT_URL"
           unauthorised_status="$(curl --silent --output /dev/null --write-out '%{http_code}' --max-time 20 "${DEPLOYMENT_URL%/}/api/health")"
           test "$unauthorised_status" = "404"
-          response="$(curl --fail --silent --show-error --location --retry 5 --retry-delay 2 --max-time 20 --header "Authorization: Bearer $ACCESS_TOKEN" "${DEPLOYMENT_URL%/}/api/health")"
-          node - "$response" "$RELEASE_SHA" <<'NODE'
+          health_matched=false
+          for attempt in $(seq 1 12); do
+            response="$(curl --fail --silent --show-error --location --max-time 20 --header "Authorization: Bearer $ACCESS_TOKEN" "${DEPLOYMENT_URL%/}/api/health")"
+            if node - "$response" "$RELEASE_SHA" <<'NODE'
           const [bodyText, expectedRelease] = process.argv.slice(2);
           const body = JSON.parse(bodyText);
           if (body.status !== "ok" || body.service !== "anchor" || body.environment !== "preview" || body.release !== expectedRelease) {
-            throw new Error("Deployed health contract does not match the reviewed release.");
+            process.exit(1);
           }
           NODE
+            then
+              health_matched=true
+              break
+            fi
+            sleep 5
+          done
+          test "$health_matched" = "true" || { echo "::error::Deployed health contract did not converge to the reviewed release."; exit 1; }
 
       - name: Trigger one privacy-scrubbed synthetic event
         id: synthetic
