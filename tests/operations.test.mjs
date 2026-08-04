@@ -93,6 +93,7 @@ test("Sentry source-map release identity matches runtime events", async () => {
 test("synthetic Sentry acceptance route fails closed outside the gated preview", async () => {
   const route = await readFile("app/api/_acceptance/sentry/route.ts", "utf8");
   assert.match(route, /NEXT_PUBLIC_ANCHOR_ENV !== "preview"/);
+  assert.match(route, /ANCHOR_SMOKE_ACCEPTANCE_ENABLED !== "true"/);
   assert.match(route, /x-anchor-acceptance-gate/);
   assert.match(route, /AnchorSyntheticAcceptanceError/);
   assert.match(route, /Sentry\.flush\(10_000\)/);
