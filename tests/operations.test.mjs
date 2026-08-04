@@ -79,3 +79,30 @@ test("release ledger covers code, content, approvals, rollback and decision", as
   assert.equal(record.governance.approvals.length, 6);
   assert.equal(record.decision.status, "draft");
 });
+
+
+test("Sentry source-map release identity matches runtime events", async () => {
+  const [privacy, vite] = await Promise.all([
+    readFile("lib/sentry-privacy.ts", "utf8"),
+    readFile("vite.config.ts", "utf8"),
+  ]);
+  assert.match(privacy, /release: `anchor@\$\{release\}`/);
+  assert.match(vite, /name: `anchor@\$\{/);
+});
+
+test("synthetic Sentry acceptance route fails closed outside the gated preview", async () => {
+  const route = await readFile("app/api/_acceptance/sentry/route.ts", "utf8");
+  assert.match(route, /NEXT_PUBLIC_ANCHOR_ENV !== "preview"/);
+  assert.match(route, /x-anchor-acceptance-gate/);
+  assert.match(route, /AnchorSyntheticAcceptanceError/);
+  assert.match(route, /Sentry\.flush\(10_000\)/);
+  assert.doesNotMatch(route, /export (?:async )?function GET/);
+});
+
+test("Cloudflare smoke adapter gates every application request", async () => {
+  const source = await readFile("smoke/worker.ts", "utf8");
+  assert.match(source, /crypto\.subtle\.timingSafeEqual/);
+  assert.match(source, /env\.ANCHOR_SMOKE_TOKEN/);
+  assert.match(source, /headers\.delete\("authorization"\)/);
+  assert.match(source, /return unauthorized\(\)/);
+});
