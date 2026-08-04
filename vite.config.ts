@@ -77,10 +77,11 @@ export default defineConfig(async () => {
               org: process.env.SENTRY_ORG,
               project: process.env.SENTRY_PROJECT,
               release: {
-                name:
+                name: `anchor@${
                   process.env.NEXT_PUBLIC_RELEASE_SHA ??
                   process.env.RELEASE_SHA ??
-                  "development",
+                  "development"
+                }`,
               },
               sourcemaps: {
                 filesToDeleteAfterUpload: ["./dist/**/*.map"],
