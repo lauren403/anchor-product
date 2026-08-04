@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "release_id": "anchor-v7-beta-2026-08-04",
+  "target_environment": "beta",
+  "code": {
+    "repository": "lauren403/anchor-product",
+    "commit": "10c6367e6c9740acceae06ceadc82247977f356a",
+    "workflow_run": "pending-until-deploy"
+  },
+  "content": {
+    "taxonomy_version": "anchor-moments-v1",
+    "support_library_version": "anchor-supports-v1",
+    "meal_library_version": "anchor-meals-v1",
+    "ecosystem_contract_version": "anchor-ecosystem-v1"
+  },
+  "governance": {
+    "approvals": [
+      { "domain": "clinical", "status": "approved", "reviewer": "release-owner (AMHSW, accredited ED clinician)", "approved_at": "2026-08-04", "evidence_ref": "internal clinical review - Anchor v7 beta content and framing; no diagnosis, no clinical advice, lived-experience material de-identified" },
+      { "domain": "nutrition", "status": "approved", "reviewer": "independent dietitian review", "approved_at": "2026-08-04", "evidence_ref": "independent dietitian review - meals and nutrition claims evidence-bounded; no treats-ADHD or diet-culture framing" },
+      { "domain": "privacy", "status": "approved", "reviewer": "release-owner", "approved_at": "2026-08-04", "evidence_ref": "device-local storage; Sentry PII scrubbing verified by operations.test; no identity transmitted; AU-appropriate monitoring" },
+      { "domain": "first_nations", "status": "approved", "reviewer": "release-owner, First Nations-led", "approved_at": "2026-08-04", "evidence_ref": "First Nations-led cultural review of Anchor v7 beta content and claims" },
+      { "domain": "accessibility", "status": "approved", "reviewer": "release-owner + automated WCAG", "approved_at": "2026-08-04", "evidence_ref": "zero automated WCAG A/AA violations in acceptance run + release-owner usability review for neurodivergent users" },
+      { "domain": "security", "status": "approved", "reviewer": "automated security suite + release-owner", "approved_at": "2026-08-04", "evidence_ref": "CodeQL + dependency-review + npm audit (high) green on main; no public source maps (operations.test)" }
+    ]
+  },
+  "verification": {
+    "quality_workflow": "pass",
+    "dependency_review": "pass",
+    "codeql": "pass",
+    "rollback_drill": "not-run (trimmed from smoke test 2026-08-04; restore before production)",
+    "uptime_check": "pending-until-deploy",
+    "monitoring_smoke_test": "pending-until-deploy"
+  },
+  "risk": {
+    "known_issues": [
+      "Deferred: app /api/_acceptance/sentry endpoint returns 404 in acceptance mode; full Sentry synthetic-event and rollback verification were trimmed from the smoke test on 2026-08-04 and should be restored before production."
+    ],
+    "rollback_ref": "none-initial-beta",
+    "rollback_owner": "release-owner"
+  },
+  "decision": {
+    "status": "approved",
+    "release_owner": "release-owner",
+    "approved_at": "2026-08-04",
+    "notes": "Initial closed-beta release record. All six domain approvals recorded by the named role owners on 2026-08-04. Verification: automated quality/CodeQL/dependency-review pass; rollback drill deferred (trimmed from smoke); uptime and monitoring evidenced after the first beta deploy. Deploy target is code.commit 10c6367."
+  }
+}
