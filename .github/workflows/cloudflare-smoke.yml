@@ -140,6 +140,15 @@ jobs:
           echo "access_token=$access_token" >> "$GITHUB_OUTPUT"
           echo "sentinel=$sentinel" >> "$GITHUB_OUTPUT"
 
+      - name: Deploy reviewed release behind temporary gate
+        id: deploy
+        uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          wranglerVersion: "4.118.0"
+          command: deploy --config wrangler.smoke.jsonc --name anchor-private-smoke --var ANCHOR_SMOKE_ACCEPTANCE_ENABLED:true --var NEXT_PUBLIC_ANCHOR_ENV:preview --var NEXT_PUBLIC_RELEASE_SHA:${{ github.sha }} --tag candidate-${{ github.run_id }} --message "Anchor isolated acceptance ${{ github.sha }}"
+
       - name: Upload temporary acceptance secrets
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -154,15 +163,6 @@ jobs:
           node -e 'require("node:fs").writeFileSync(process.argv[1], JSON.stringify({SENTRY_DSN:process.env.SENTRY_DSN,ANCHOR_SMOKE_TOKEN:process.env.ANCHOR_SMOKE_TOKEN}), {mode:0o600})' "$secrets_file"
           ./node_modules/.bin/wrangler secret bulk "$secrets_file" --config wrangler.smoke.jsonc --name "$WORKER_NAME"
 
-      - name: Deploy reviewed release behind temporary gate
-        id: deploy
-        uses: cloudflare/wrangler-action@v4
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          wranglerVersion: "4.118.0"
-          command: deploy --config wrangler.smoke.jsonc --name anchor-private-smoke --var ANCHOR_SMOKE_ACCEPTANCE_ENABLED:true --var NEXT_PUBLIC_ANCHOR_ENV:preview --var NEXT_PUBLIC_RELEASE_SHA:${{ github.sha }} --tag candidate-${{ github.run_id }} --message "Anchor isolated acceptance ${{ github.sha }}"
-
       - name: Verify access gate and health contract
         env:
           DEPLOYMENT_URL: ${{ steps.deploy.outputs.deployment-url }}
@@ -175,7 +175,7 @@ jobs:
           test "$unauthorised_status" = "404"
           health_matched=false
           for attempt in $(seq 1 12); do
-            response="$(curl --fail --silent --show-error --location --max-time 20 --header "Authorization: Bearer $ACCESS_TOKEN" "${DEPLOYMENT_URL%/}/api/health")"
+            response="$(curl --fail --silent --show-error --location --max-time 20 --header "Authorization: Bearer $ACCESS_TOKEN" "${DEPLOYMENT_URL%/}/api/health")" || true
             if node - "$response" "$RELEASE_SHA" <<'NODE'
           const [bodyText, expectedRelease] = process.argv.slice(2);
           const body = JSON.parse(bodyText);
