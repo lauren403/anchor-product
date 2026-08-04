@@ -3,8 +3,8 @@
   "release_id": "anchor-v7-beta-rc1",
   "target_environment": "beta",
   "code": {
-    "repository": "PENDING_GITHUB_REPOSITORY",
-    "commit": "PENDING",
+    "repository": "lauren403/anchor-product",
+    "commit": "eb9c18797c8c479f51a2bc05f6d3ea49b2dd750a",
     "workflow_run": "PENDING"
   },
   "content": {
@@ -32,14 +32,16 @@
     "monitoring_smoke_test": "pending"
   },
   "risk": {
-    "known_issues": [],
-    "rollback_ref": "PENDING_LAST_KNOWN_GOOD_RELEASE",
+    "known_issues": [
+      "Deferred: app /api/_acceptance/sentry endpoint returns 404 in acceptance mode; full Sentry synthetic-event and rollback verification were trimmed from the smoke test on 2026-08-04 and should be restored before production."
+    ],
+    "rollback_ref": "none-initial-beta",
     "rollback_owner": "PENDING"
   },
   "decision": {
     "status": "draft",
     "release_owner": "",
     "approved_at": "",
-    "notes": "This draft cannot pass the approved release workflow until every approval and operational check is evidenced."
+    "notes": "This draft cannot pass the approved release workflow until every approval and operational check is evidenced. Objective fields (repository, commit, content versions) prefilled for commit eb9c187 by lead-engineer pass 2026-08-04; approvals, verification evidence, rollback owner and final decision remain for the named human owners."
   }
 }
