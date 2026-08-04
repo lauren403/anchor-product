@@ -1,3 +1,5 @@
+import { timingSafeEqual } from "node:crypto";
+
 // The application artifact is produced by the verified Vinext build before
 // Wrangler bundles this acceptance-only adapter.
 // @ts-expect-error generated deployment artifact is absent during source typecheck
@@ -25,7 +27,7 @@ async function hasValidBearer(request: Request, expected: string): Promise<boole
     crypto.subtle.digest("SHA-256", encoded.encode(expected)),
   ]);
 
-  return crypto.subtle.timingSafeEqual(suppliedDigest, expectedDigest);
+  return timingSafeEqual(new Uint8Array(suppliedDigest), new Uint8Array(expectedDigest));
 }
 
 export default {
