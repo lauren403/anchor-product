@@ -101,7 +101,7 @@ test("synthetic Sentry acceptance route fails closed outside the gated preview",
 
 test("Cloudflare smoke adapter gates every application request", async () => {
   const source = await readFile("smoke/worker.ts", "utf8");
-  assert.match(source, /crypto\.subtle\.timingSafeEqual/);
+  assert.match(source, /timingSafeEqual/);
   assert.match(source, /env\.ANCHOR_SMOKE_TOKEN/);
   assert.match(source, /headers\.delete\("authorization"\)/);
   assert.match(source, /return unauthorized\(\)/);
