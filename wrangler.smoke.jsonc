@@ -6,6 +6,9 @@
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": true,
   "preview_urls": false,
+  "vars": {
+    "ANCHOR_SMOKE_ACCEPTANCE_ENABLED": "true"
+  },
   "assets": {
     "directory": "./dist/client",
     "binding": "ASSETS",
