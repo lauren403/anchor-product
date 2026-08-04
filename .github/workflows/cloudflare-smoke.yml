@@ -161,7 +161,7 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           wranglerVersion: "4.118.0"
-          command: deploy --config wrangler.smoke.jsonc --name anchor-private-smoke --var NEXT_PUBLIC_ANCHOR_ENV:preview --var NEXT_PUBLIC_RELEASE_SHA:${{ github.sha }} --tag candidate-${{ github.run_id }} --message "Anchor isolated acceptance ${{ github.sha }}"
+          command: deploy --config wrangler.smoke.jsonc --name anchor-private-smoke --var ANCHOR_SMOKE_ACCEPTANCE_ENABLED:true --var NEXT_PUBLIC_ANCHOR_ENV:preview --var NEXT_PUBLIC_RELEASE_SHA:${{ github.sha }} --tag candidate-${{ github.run_id }} --message "Anchor isolated acceptance ${{ github.sha }}"
 
       - name: Verify access gate and health contract
         env:
