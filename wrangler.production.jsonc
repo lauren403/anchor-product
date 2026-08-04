@@ -1,0 +1,33 @@
+{
+  // Production / beta deploy config for Anchor v7.
+  // Mirrors wrangler.smoke.jsonc but WITHOUT the acceptance-gate wrapper:
+  // production serves the app publicly (no Bearer token in front of /api/health).
+  // The worker name and environment are set per-deploy via --name / --var flags
+  // in .github/workflows/deploy.yml (anchor-beta or anchor-production).
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "anchor",
+  "main": "./dist/server/index.js",
+  "compatibility_date": "2026-08-04",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "preview_urls": false,
+  "assets": {
+    "directory": "./dist/client",
+    "binding": "ASSETS",
+    "run_worker_first": true
+  },
+  "images": {
+    "binding": "IMAGES"
+  },
+  "observability": {
+    "enabled": true,
+    "logs": {
+      "enabled": true,
+      "head_sampling_rate": 1
+    }
+  }
+  // No d1_databases / r2_buckets: .openai/hosting.json has d1=null, r2=null,
+  // so the app ships device-local with no server database (matches README).
+  // If server-side storage is added later, provision a D1 database and add a
+  // "d1_databases" binding named "DB" here, then run drizzle migrations.
+}
