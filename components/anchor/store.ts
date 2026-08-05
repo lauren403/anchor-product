@@ -76,15 +76,17 @@ function strings(value: unknown): string[] {
 
 // --- Legacy check-in / wins migration -------------------------------------
 // The deployed v1/v2 apps (key bbc-anchor-v1 / bbc-anchor-v2) stored a simpler
-// shape than v7 renders: check-ins as { at, ate, feeling, note } and a separate
-// wins[] of { at, text }. The very first v0.1 build (bbc-anchor:v1) used
-// { ts, cue, note } and wins { ts, label }. We translate all of these into v7's
-// CheckIn shape so nothing is lost and history displays with real dates. Per
-// product decision, wins are folded into the check-in/spark stream (each win
-// becomes a spark-carrying entry) rather than a separate view.
+// shape than v7 renders: check-ins as { at, ate, feeling, hunger, energy, note }
+// and a separate wins[] of { at, text } (the "spark" input writes here). The
+// very first v0.1 build (bbc-anchor:v1) used { ts, cue, note } and wins { ts,
+// label }. We translate all of these into v7's CheckIn shape so nothing is lost
+// and history displays with real dates. Per product decision, wins/sparks are
+// folded into the check-in/spark stream rather than a separate view.
 
 const FEELING_LABELS: Record<string, string> = { steady: "Steady", foggy: "Foggy", wired: "Wired", low: "Low", okay: "Okay" };
 const ATE_LABELS: Record<string, string> = { yes: "Yes", "a-little": "A little", "not-yet": "Not yet" };
+const HUNGER_LABELS: Record<string, string> = { none: "Nothing yet", faint: "A whisper", clear: "Clearly hungry", "not-sure": "Not sure" };
+const ENERGY_LABELS: Record<string, string> = { low: "Low", steady: "Steady", wired: "Wired" };
 const CUE_LABELS: Record<string, string> = { fed: "Fed", okay: "Okay", "getting-empty": "Getting empty", "running-on-empty": "Running on empty" };
 
 function toIso(value: unknown): string {
@@ -100,15 +102,20 @@ function translateCheckin(entry: unknown): CheckIn | null {
   const item = asObject(entry);
   if (!Object.keys(item).length) return null;
   const createdAt = typeof item.createdAt === "string" ? item.createdAt : toIso(item.at ?? item.ts);
-  // Already v7-shaped: keep as-is (only ensure a createdAt exists).
-  if (typeof item.createdAt === "string" || typeof item.pattern === "string" || typeof item.brain === "string" || typeof item.spark === "string" || typeof item.energy === "string" || typeof item.fuel === "string") {
+  // Already v7-shaped: keep as-is (only ensure a createdAt exists). Detect via
+  // fields ONLY v7 writes (createdAt / pattern / brain / spark). Do NOT include
+  // energy or fuel here — the live v1 check-in also carries an `energy` field,
+  // so keying on it would wrongly skip translating a legacy entry.
+  if (typeof item.createdAt === "string" || typeof item.pattern === "string" || typeof item.brain === "string" || typeof item.spark === "string") {
     return { ...(item as CheckIn), createdAt };
   }
   const out: CheckIn = { id: typeof item.id === "string" && item.id ? item.id : localId(), createdAt };
   if (typeof item.note === "string" && item.note) out.note = item.note.slice(0, 500);
   if (typeof item.feeling === "string") out.brain = FEELING_LABELS[item.feeling] ?? item.feeling;
   if (typeof item.ate === "string") out.fuel = ATE_LABELS[item.ate] ?? item.ate;
-  if (typeof item.cue === "string") out.body = CUE_LABELS[item.cue] ?? item.cue;
+  if (typeof item.energy === "string") out.energy = ENERGY_LABELS[item.energy] ?? item.energy;
+  if (typeof item.hunger === "string") out.body = HUNGER_LABELS[item.hunger] ?? item.hunger;
+  else if (typeof item.cue === "string") out.body = CUE_LABELS[item.cue] ?? item.cue;
   return out;
 }
 
@@ -148,8 +155,8 @@ function normalise(raw: unknown): AnchorProductState {
     ...base,
     onboarded: Boolean(source.onboarded ?? settings.onboarded),
     name: typeof source.name === "string" ? source.name.slice(0, 40) : typeof settings.name === "string" ? settings.name.slice(0, 40) : "",
-    why: typeof source.why === "string" ? source.why.slice(0, 120) : "",
-    medicationWindow: typeof source.medicationWindow === "string" ? source.medicationWindow : typeof settings.wearOffTime === "string" ? settings.wearOffTime : base.medicationWindow,
+    why: typeof source.why === "string" ? source.why.slice(0, 120) : typeof settings.values === "string" ? settings.values.slice(0, 120) : "",
+    medicationWindow: typeof source.medicationWindow === "string" ? source.medicationWindow : typeof settings.wearOffTime === "string" ? settings.wearOffTime : typeof settings.medsWearOff === "string" ? settings.medsWearOff : base.medicationWindow,
     rhythm: rhythm.length ? rhythm : base.rhythm,
     favourites: strings(source.favourites),
     savedFuelIds: strings(source.savedFuelIds ?? source.safeFoods),
