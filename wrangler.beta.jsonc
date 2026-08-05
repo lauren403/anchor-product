@@ -13,10 +13,15 @@
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": true,
   "preview_urls": false,
+  // run_worker_first is intentionally OFF for the gated rehearsal: with a wrapper
+  // worker as `main`, routing every request (incl. static assets) through the
+  // wrapper causes the app's JS/CSS to 404. With it off, Cloudflare serves
+  // /assets/* directly and the wrapper still gates the app's HTML/SSR routes.
+  // (Production, wrangler.production.jsonc, keeps run_worker_first: true because
+  // there the app worker itself is `main` and serves assets correctly.)
   "assets": {
     "directory": "./dist/client",
-    "binding": "ASSETS",
-    "run_worker_first": true
+    "binding": "ASSETS"
   },
   "images": {
     "binding": "IMAGES"
