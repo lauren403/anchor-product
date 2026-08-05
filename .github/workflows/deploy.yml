@@ -2,17 +2,17 @@ name: Deploy Anchor
 
 # Governed go-live workflow for Anchor v7 (beta or production).
 #
-# This is the "approved hosting mechanism" that docs/RELEASE_ENGINEERING.md
-# intentionally left unimplemented. It does NOT bypass governance — it enforces it:
-#   1. Runs inside a protected GitHub Environment (beta / production) that must
-#      have a REQUIRED REVIEWER. The deploy pauses for that approver.
-#   2. Refuses to deploy unless a fully APPROVED release record for this exact
-#      commit + environment exists (validate:release --require-approved). While
-#      the record is a draft, this workflow CANNOT deploy anything — fail closed.
-#   3. Rebuilds and re-runs the full quality gate before shipping.
-#
-# Until the beta/production environments are created with reviewers AND an
-# approved release record exists, dispatching this workflow safely fails.
+# Deploys EXACTLY the commit named in an APPROVED release record -- not "latest main".
+# This is the "approved hosting mechanism" docs/RELEASE_ENGINEERING.md left unimplemented.
+# It enforces governance rather than bypassing it:
+#   1. Runs inside a protected GitHub Environment (beta / production).
+#   2. Requires a fully APPROVED release record (validate:release --require-approved);
+#      fails closed while the record is a draft. The default record below is the pinned
+#      placeholder seed, which can never be approved -- so a defaults-only run fails safe.
+#   3. Checks out record.code.commit (the reviewed, approved product) and rebuilds it
+#      through the full quality gate before shipping.
+#   4. Sets the Sentry secret after deploy; retry-safe public health check that the live
+#      release identity equals the approved commit.
 
 on:
   workflow_dispatch:
@@ -23,7 +23,7 @@ on:
         type: choice
         options: [beta, production]
       release_record:
-        description: Path to the APPROVED JSON release record
+        description: Path to the APPROVED release record (e.g. governance/releases/anchor-v7-beta-2026-08-04.json)
         required: true
         default: governance/releases/anchor-v7-beta-rc1.json
       confirmation:
@@ -44,7 +44,6 @@ jobs:
     environment: ${{ inputs.target_environment }}
     timeout-minutes: 40
     env:
-      RELEASE_SHA: ${{ github.sha }}
       WORKER_NAME: anchor-${{ inputs.target_environment }}
     steps:
       - name: Enforce deploy boundary
@@ -69,18 +68,34 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
 
-      - name: Verify reviewed source lineage
-        shell: bash
-        run: |
-          set -euo pipefail
-          test "$(git rev-parse HEAD)" = "$RELEASE_SHA"
-          git diff --exit-code
-          git diff --cached --exit-code
-
       - uses: actions/setup-node@v6
         with:
           node-version-file: .nvmrc
           cache: npm
+
+      - name: Require an approved release record and resolve the target commit
+        id: record
+        env:
+          RECORD: ${{ inputs.release_record }}
+          TARGET: ${{ inputs.target_environment }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f "$RECORD" || { echo "::error::Release record not found: $RECORD"; exit 1; }
+          npm run validate:release -- "$RECORD" --require-approved
+          target_commit="$(node -e 'process.stdout.write(JSON.parse(require("node:fs").readFileSync(process.argv[1],"utf8")).code.commit)' "$RECORD")"
+          node scripts/verify-release-target.mjs "$RECORD" "$TARGET" "$target_commit"
+          echo "target_commit=$target_commit" >> "$GITHUB_OUTPUT"
+
+      - name: Check out the approved commit
+        env:
+          TARGET_COMMIT: ${{ steps.record.outputs.target_commit }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git checkout --force "$TARGET_COMMIT"
+          test "$(git rev-parse HEAD)" = "$TARGET_COMMIT"
+          git diff --exit-code
 
       - name: Install locked dependencies
         run: npm ci --ignore-scripts
@@ -88,21 +103,10 @@ jobs:
       - name: Validate environment configuration
         run: npm run validate:config -- --environment "${{ inputs.target_environment }}"
 
-      - name: Require an approved release record for this commit + environment
-        env:
-          RECORD: ${{ inputs.release_record }}
-          TARGET: ${{ inputs.target_environment }}
-          COMMIT: ${{ github.sha }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          npm run validate:release -- "$RECORD" --require-approved
-          node scripts/verify-release-target.mjs "$RECORD" "$TARGET" "$COMMIT"
-
-      - name: Validate, test and build reviewed release
+      - name: Validate, test and build the approved release
         env:
           NEXT_PUBLIC_ANCHOR_ENV: ${{ inputs.target_environment }}
-          NEXT_PUBLIC_RELEASE_SHA: ${{ github.sha }}
+          NEXT_PUBLIC_RELEASE_SHA: ${{ steps.record.outputs.target_commit }}
           NEXT_PUBLIC_SENTRY_DSN: ${{ secrets.NEXT_PUBLIC_SENTRY_DSN }}
           SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
           SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
@@ -135,8 +139,8 @@ jobs:
             deploy --config wrangler.production.jsonc
             --name ${{ env.WORKER_NAME }}
             --var NEXT_PUBLIC_ANCHOR_ENV:${{ inputs.target_environment }}
-            --var NEXT_PUBLIC_RELEASE_SHA:${{ github.sha }}
-            --message "Anchor ${{ inputs.target_environment }} ${{ github.sha }}"
+            --var NEXT_PUBLIC_RELEASE_SHA:${{ steps.record.outputs.target_commit }}
+            --message "Anchor ${{ inputs.target_environment }} ${{ steps.record.outputs.target_commit }}"
 
       - name: Set runtime secrets (after deploy)
         env:
@@ -155,6 +159,7 @@ jobs:
         env:
           DEPLOYMENT_URL: ${{ steps.deploy.outputs.deployment-url }}
           TARGET: ${{ inputs.target_environment }}
+          TARGET_COMMIT: ${{ steps.record.outputs.target_commit }}
         shell: bash
         run: |
           set -euo pipefail
@@ -163,7 +168,7 @@ jobs:
           healthy=false
           for attempt in $(seq 1 12); do
             if response="$(curl --fail --silent --show-error --location --max-time 20 "${DEPLOYMENT_URL%/}/api/health")"; then
-              if node -e 'const b=JSON.parse(process.argv[1]); if(b.status!=="ok"||b.service!=="anchor"||b.environment!==process.argv[2]||b.release!==process.argv[3])process.exit(1)' "$response" "$TARGET" "$RELEASE_SHA"; then
+              if node -e 'const b=JSON.parse(process.argv[1]); if(b.status!=="ok"||b.service!=="anchor"||b.environment!==process.argv[2]||b.release!==process.argv[3])process.exit(1)' "$response" "$TARGET" "$TARGET_COMMIT"; then
                 healthy=true
                 break
               fi
