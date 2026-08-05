@@ -35,7 +35,10 @@ export interface AnchorProductState {
 }
 
 const STORAGE_KEY = "bbc-anchor-v7";
-const PREVIOUS_KEYS = ["bbc-anchor-v5", "bbc-anchor-v4", "bbc-anchor-v3", "bbc-anchor-v2", "bbc-anchor-v1"] as const;
+// Older builds this device may have written to. Ordered newest-first so the most
+// recent prior state wins. Includes the very first v0.1 key `bbc-anchor:v1`
+// (colon), which some of the earliest testers may still carry.
+const PREVIOUS_KEYS = ["bbc-anchor-v5", "bbc-anchor-v4", "bbc-anchor-v3", "bbc-anchor-v2", "bbc-anchor-v1", "bbc-anchor:v1"] as const;
 
 export function localId(): string {
   if (typeof globalThis.crypto?.randomUUID === "function") return globalThis.crypto.randomUUID();
@@ -71,6 +74,60 @@ function strings(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
 }
 
+// --- Legacy check-in / wins migration -------------------------------------
+// The deployed v1/v2 apps (key bbc-anchor-v1 / bbc-anchor-v2) stored a simpler
+// shape than v7 renders: check-ins as { at, ate, feeling, note } and a separate
+// wins[] of { at, text }. The very first v0.1 build (bbc-anchor:v1) used
+// { ts, cue, note } and wins { ts, label }. We translate all of these into v7's
+// CheckIn shape so nothing is lost and history displays with real dates. Per
+// product decision, wins are folded into the check-in/spark stream (each win
+// becomes a spark-carrying entry) rather than a separate view.
+
+const FEELING_LABELS: Record<string, string> = { steady: "Steady", foggy: "Foggy", wired: "Wired", low: "Low", okay: "Okay" };
+const ATE_LABELS: Record<string, string> = { yes: "Yes", "a-little": "A little", "not-yet": "Not yet" };
+const CUE_LABELS: Record<string, string> = { fed: "Fed", okay: "Okay", "getting-empty": "Getting empty", "running-on-empty": "Running on empty" };
+
+function toIso(value: unknown): string {
+  if (typeof value === "number" && Number.isFinite(value)) return new Date(value).toISOString();
+  if (typeof value === "string" && value) {
+    const parsed = Date.parse(value);
+    return Number.isFinite(parsed) ? new Date(parsed).toISOString() : value;
+  }
+  return new Date().toISOString();
+}
+
+function translateCheckin(entry: unknown): CheckIn | null {
+  const item = asObject(entry);
+  if (!Object.keys(item).length) return null;
+  const createdAt = typeof item.createdAt === "string" ? item.createdAt : toIso(item.at ?? item.ts);
+  // Already v7-shaped: keep as-is (only ensure a createdAt exists).
+  if (typeof item.createdAt === "string" || typeof item.pattern === "string" || typeof item.brain === "string" || typeof item.spark === "string" || typeof item.energy === "string" || typeof item.fuel === "string") {
+    return { ...(item as CheckIn), createdAt };
+  }
+  const out: CheckIn = { id: typeof item.id === "string" && item.id ? item.id : localId(), createdAt };
+  if (typeof item.note === "string" && item.note) out.note = item.note.slice(0, 500);
+  if (typeof item.feeling === "string") out.brain = FEELING_LABELS[item.feeling] ?? item.feeling;
+  if (typeof item.ate === "string") out.fuel = ATE_LABELS[item.ate] ?? item.ate;
+  if (typeof item.cue === "string") out.body = CUE_LABELS[item.cue] ?? item.cue;
+  return out;
+}
+
+function winToCheckin(entry: unknown): CheckIn | null {
+  const item = asObject(entry);
+  const text = typeof item.text === "string" ? item.text : typeof item.label === "string" ? item.label : "";
+  if (!text) return null;
+  return { id: typeof item.id === "string" && item.id ? item.id : localId(), createdAt: toIso(item.at ?? item.ts), pattern: "A small win", spark: text.slice(0, 180) };
+}
+
+function mergeLegacyCheckins(source: Record<string, unknown>): CheckIn[] {
+  const checkins = Array.isArray(source.checkins) ? source.checkins.map(translateCheckin).filter((item): item is CheckIn => Boolean(item)) : [];
+  const wins = Array.isArray(source.wins) ? source.wins.map(winToCheckin).filter((item): item is CheckIn => Boolean(item)) : [];
+  return [...checkins, ...wins]
+    .sort((a, b) => String(a.createdAt ?? "").localeCompare(String(b.createdAt ?? "")))
+    .slice(-100);
+}
+// --------------------------------------------------------------------------
+
 function normalise(raw: unknown): AnchorProductState {
   const source = asObject(raw);
   const base = freshState();
@@ -97,7 +154,7 @@ function normalise(raw: unknown): AnchorProductState {
     favourites: strings(source.favourites),
     savedFuelIds: strings(source.savedFuelIds ?? source.safeFoods),
     savedMealIds: strings(source.savedMealIds),
-    checkins: Array.isArray(source.checkins) ? source.checkins.filter((item): item is CheckIn => Boolean(item && typeof item === "object")).slice(-100) : [],
+    checkins: mergeLegacyCheckins(source),
     programHistory: Array.isArray(source.programHistory) ? source.programHistory.filter((item): item is { programId: string; completedAt: string } => Boolean(item && typeof item === "object" && typeof (item as { programId?: unknown }).programId === "string")).slice(-100) : [],
     oneThing: typeof source.oneThing === "string" ? source.oneThing.slice(0, 120) : "",
     settings: { remindersOn: Boolean(settings.remindersOn) },
