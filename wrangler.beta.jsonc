@@ -1,0 +1,31 @@
+{
+  // Rehearsal beta deploy config for Anchor v7. Mirrors wrangler.smoke.jsonc but
+  // fronts the app with an HTTP Basic password gate (beta/worker.ts) instead of
+  // the Bearer acceptance gate. Deploys a throwaway workers.dev worker named
+  // anchor-beta-rehearsal — NOT the live site. The password is a secret:
+  //   wrangler secret put ANCHOR_BETA_PASSWORD --config wrangler.beta.jsonc
+  // (optional ANCHOR_BETA_USER, defaults to "beta"). run_worker_first keeps the
+  // gate in front of static assets so nothing bypasses it.
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "anchor-beta-rehearsal",
+  "main": "./beta/worker.ts",
+  "compatibility_date": "2026-08-04",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "preview_urls": false,
+  "assets": {
+    "directory": "./dist/client",
+    "binding": "ASSETS",
+    "run_worker_first": true
+  },
+  "images": {
+    "binding": "IMAGES"
+  },
+  "observability": {
+    "enabled": true,
+    "logs": {
+      "enabled": true,
+      "head_sampling_rate": 1
+    }
+  }
+}
