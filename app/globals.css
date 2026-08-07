@@ -489,3 +489,10 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 .learn-help, .learn-talk { border-top: 1px solid var(--line); padding-top: .9rem; margin-top: .3rem; margin-bottom: 1rem; }
 .learn-support { margin: 1rem 0; }
 .learn-honesty { margin-top: 1rem; padding-top: .8rem; border-top: 1px solid var(--line); font-size: .8rem; font-style: italic; color: var(--muted); }
+
+/* Learn — gentle Today entry point */
+.learn-today-card { background: linear-gradient(120deg, #f3ead8, #efe3ce); color: var(--plum); }
+.learn-today-card .mini-label { color: var(--clay); }
+.learn-today-card strong { font: 500 clamp(1.4rem, 3.5vw, 2rem)/1.12 'Fraunces'; margin: .3rem 0 .5rem; }
+.learn-today-sub { color: var(--muted); }
+.learn-today-card .card-link { margin-top: 1rem; color: var(--clay); }

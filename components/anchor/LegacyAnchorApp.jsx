@@ -273,6 +273,20 @@ function Today({ state, onOpen, onNavigate }) {
         </div>
       </section>
 
+      {learnSeries.length > 0 && (() => {
+        const featured = learnSeries[new Date().getDate() % learnSeries.length]
+        return (
+          <section>
+            <button className="feature-card learn-today-card" onClick={() => onNavigate('learn')}>
+              <span className="mini-label">A gentle read</span>
+              <strong>{featured.title}</strong>
+              <span className="learn-today-sub">{featured.sub}</span>
+              <span className="card-link">Open Learn <ChevronRight size={16} /></span>
+            </button>
+          </section>
+        )
+      })()}
+
       <section className="program-strip">
         <div><p className="eyebrow">Guided company</p><h2>You do not have to start alone.</h2></div>
         <button className="button cream" onClick={() => onOpen('program:eat-with-me')}><Play size={18} /> Eat with me · 10 min</button>
