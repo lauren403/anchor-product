@@ -496,3 +496,13 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 .learn-today-card strong { font: 500 clamp(1.4rem, 3.5vw, 2rem)/1.12 'Fraunces'; margin: .3rem 0 .5rem; }
 .learn-today-sub { color: var(--muted); }
 .learn-today-card .card-link { margin-top: 1rem; color: var(--clay); }
+
+/* Cycle-aware gentleness */
+.gentle-banner { padding: clamp(1.15rem, 3vw, 1.6rem) clamp(1.2rem, 3vw, 1.7rem); border: 1px solid var(--line); border-left: 4px solid var(--olive); border-radius: 20px; background: var(--olive-pale); }
+.gentle-banner .eyebrow { color: #4f5a3e; }
+.gentle-lead { margin: 0 0 1rem; color: #3d4934; font-size: 1.02rem; line-height: 1.6; }
+.gentle-actions { margin-bottom: .6rem; }
+.gentle-links { display: flex; flex-wrap: wrap; gap: .2rem 1.1rem; }
+.gentle-links .text-button { color: #4f5a3e; }
+.gentle-setting-row { grid-template-columns: auto 1fr; min-height: 50px; }
+.gentle-setting-row .rhythm-label { font-weight: 600; }
