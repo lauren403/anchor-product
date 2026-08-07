@@ -204,7 +204,7 @@ function NextMoment({ rhythm, onPlan }) {
   )
 }
 
-function Today({ state, onOpen, onNavigate }) {
+function Today({ state, onOpen, onNavigate, softened, onShowEverything, onEndHarderWeek }) {
   const hour = new Date().getHours()
   const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening'
   const favouritePaths = rightNowPaths.filter((item) => state.favourites.includes(item.id)).slice(0, 3)
@@ -222,6 +222,20 @@ function Today({ state, onOpen, onNavigate }) {
         <h1>What would help right now?</h1>
         <p className="lead">No perfect plan. Just one place to begin.</p>
       </section>
+
+      {softened && (
+        <section className="gentle-banner" aria-label="A gentler week">
+          <p className="eyebrow">A gentler week</p>
+          <p className="gentle-lead">This might be a harder stretch — so Anchor is keeping things gentle with you. Lower the bar where you can, and be kind to yourself. A real person is right here whenever you want one.</p>
+          <div className="gentle-actions">
+            <button className="button primary" onClick={() => onNavigate('more')}>Reach a real person <ChevronRight size={16} /></button>
+          </div>
+          <div className="gentle-links">
+            <button className="text-button" onClick={onShowEverything}>Show me everything</button>
+            <button className="text-button" onClick={onEndHarderWeek}>I&rsquo;m through this week</button>
+          </div>
+        </section>
+      )}
 
       <MomentFinder />
 
@@ -658,7 +672,7 @@ function Learn() {
   )
 }
 
-function More({ state, reset }) {
+function More({ state, reset, update }) {
   const [confirmReset, setConfirmReset] = useState(false)
   function exportData() {
     const blob = new Blob([JSON.stringify({ exportedAt: new Date().toISOString(), product: state, recommendations: loadAnchorState() }, null, 2)], { type: 'application/json' })
@@ -675,6 +689,25 @@ function More({ state, reset }) {
         <div className="section-heading"><div><p className="eyebrow">If things feel hard</p><h2>Reach a real person</h2></div></div>
         <div className="support-grid">{supportLinks.map((link) => <a key={link.label} href={link.href} className="support-card"><div><strong>{link.label}</strong><span>{link.detail}</span></div><b>{link.phone}</b></a>)}</div>
         <a className="button primary full" href="https://www.halaxy.com/profile/ms-lauren-lynch/social-worker/1772313" target="_blank" rel="noreferrer">Book a free Body Belonging intro call <ExternalLink size={17} /></a>
+      </section>
+
+      <section className="settings-card">
+        <div className="settings-heading"><div><p className="eyebrow">Optional · private · on your device</p><h2>Cycle-aware gentleness</h2></div><HeartHandshake /></div>
+        <p>If some weeks feel like a headwind — more fog, a shorter fuse, heavier feelings — Anchor can lean gentler with you when you say so. No dates, no tracking, no numbers: just one tap when a harder week arrives, and off again when it passes.</p>
+        <div className="rhythm-row gentle-setting-row">
+          <button className={`toggle-dot ${state.gentleness?.enabled ? 'on' : ''}`} onClick={() => update({ gentleness: { enabled: !state.gentleness?.enabled, harderWeek: state.gentleness?.enabled ? false : Boolean(state.gentleness?.harderWeek) } })} aria-label={`${state.gentleness?.enabled ? 'Turn off' : 'Turn on'} cycle-aware gentleness`} aria-pressed={Boolean(state.gentleness?.enabled)}>{state.gentleness?.enabled && <Check size={14} />}</button>
+          <span className="rhythm-label">Turn on cycle-aware gentleness</span>
+        </div>
+        {state.gentleness?.enabled && (
+          <>
+            <div className="rhythm-row gentle-setting-row">
+              <button className={`toggle-dot ${state.gentleness?.harderWeek ? 'on' : ''}`} onClick={() => update({ gentleness: { ...state.gentleness, harderWeek: !state.gentleness?.harderWeek } })} aria-label={`${state.gentleness?.harderWeek ? 'Turn off' : 'Turn on'} harder week`} aria-pressed={Boolean(state.gentleness?.harderWeek)}>{state.gentleness?.harderWeek && <Check size={14} />}</button>
+              <span className="rhythm-label">I&rsquo;m in a harder week right now</span>
+            </div>
+            <p className="small-note">When this is on, Anchor greets you more gently and keeps support close on your Today screen. You can tap &ldquo;Show me everything&rdquo; there any time — it only ever softens, never asks more of you.</p>
+          </>
+        )}
+        <p className="small-note">This lives only on your device. It changes gentleness and how close support sits — nothing else. Anchor never links it to food, weight or your body.</p>
       </section>
 
       <section className="settings-card privacy-section">
@@ -816,6 +849,10 @@ export default function App() {
   }
   const [tab, setTab] = useState(() => initialCampaign() ? 'explore' : 'today')
   const [activeTool, setActiveTool] = useState(() => initialCampaign()?.action || null)
+  // Session-only un-soften. Cycle-aware gentleness is a nudge, never a lock:
+  // "Show me everything" restores the full app for this session without changing
+  // the saved setting. Resets on reload, as the design intends.
+  const [showEverything, setShowEverything] = useState(false)
 
   const title = useMemo(() => navItems.find((item) => item.id === tab)?.label, [tab])
   useEffect(() => { document.title = `${title} · Anchor` }, [title])
@@ -850,12 +887,12 @@ export default function App() {
       <Header />
       <Navigation active={tab} onChange={navigate} />
       <main id="main-content" className="content-shell">
-        {tab === 'today' && <Today state={state} onOpen={setActiveTool} onNavigate={navigate} />}
+        {tab === 'today' && <Today state={state} onOpen={setActiveTool} onNavigate={navigate} softened={Boolean(state.gentleness?.enabled && state.gentleness?.harderWeek && !showEverything)} onShowEverything={() => setShowEverything(true)} onEndHarderWeek={() => update({ gentleness: { ...state.gentleness, harderWeek: false } })} />}
         {tab === 'explore' && <Explore state={state} onOpen={setActiveTool} onFavourite={toggleFavourite} onToggleFuel={toggleFuel} onToggleMeal={toggleMeal} />}
         {tab === 'plan' && <Plan state={state} update={update} onToggleFuel={toggleFuel} onToggleMeal={toggleMeal} onOpen={setActiveTool} />}
         {tab === 'checkin' && <CheckIn state={state} addCheckin={addCheckin} />}
         {tab === 'learn' && <Learn />}
-        {tab === 'more' && <More state={state} reset={reset} />}
+        {tab === 'more' && <More state={state} reset={reset} update={update} />}
       </main>
       {activeTool && <ToolModal toolId={activeTool} onClose={() => setActiveTool(null)} onAction={handleAction} favourite={state.favourites.includes(activeTool)} onFavourite={toggleFavourite} savedMeal={state.savedMealIds.includes(activeTool.replace('meal:', ''))} onToggleMeal={toggleMeal} />}
     </div>

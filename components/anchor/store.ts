@@ -31,6 +31,10 @@ export interface AnchorProductState {
   programHistory: Array<{ programId: string; completedAt: string }>;
   oneThing: string;
   settings: { remindersOn: boolean };
+  // Cycle-aware gentleness — opt-in, numbers-light, on-device only.
+  // `enabled` opts into the feature; `harderWeek` is the one-tap "I'm in a
+  // harder week". No dates, no cycle numbers — by design. Only ever softens.
+  gentleness: { enabled: boolean; harderWeek: boolean };
   migratedAt: string | null;
 }
 
@@ -63,6 +67,7 @@ const freshState = (): AnchorProductState => ({
   programHistory: [],
   oneThing: "",
   settings: { remindersOn: false },
+  gentleness: { enabled: false, harderWeek: false },
   migratedAt: null,
 });
 
@@ -165,6 +170,7 @@ function normalise(raw: unknown): AnchorProductState {
     programHistory: Array.isArray(source.programHistory) ? source.programHistory.filter((item): item is { programId: string; completedAt: string } => Boolean(item && typeof item === "object" && typeof (item as { programId?: unknown }).programId === "string")).slice(-100) : [],
     oneThing: typeof source.oneThing === "string" ? source.oneThing.slice(0, 120) : "",
     settings: { remindersOn: Boolean(settings.remindersOn) },
+    gentleness: { enabled: Boolean(asObject(source.gentleness).enabled), harderWeek: Boolean(asObject(source.gentleness).harderWeek) },
     migratedAt: typeof source.migratedAt === "string" ? source.migratedAt : new Date().toISOString(),
   };
 }
