@@ -206,21 +206,22 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # The endpoint requires FOUR conditions, and this caller only ever met
-          # three. app/api/_acceptance/sentry/route.ts has always also required
-          #     request.headers.get("x-anchor-acceptance-gate") === "verified"
-          # and this curl has never sent it - so the route fell through to its
-          # 404 no matter what else was correct. That is the second half of the
-          # "endpoint returns 404 in acceptance mode" known issue on the v7 beta
-          # record; fixing the build-time flag alone was necessary but not
-          # sufficient. Verified against eb9c187: the mismatch predates the
-          # 2026-08-04 trim, so this stage has never once passed.
+          # This stage had never once passed, for a reason no amount of reading
+          # the guard could reveal: the route did not exist.
           #
-          # This is not a secret and does not weaken the gate. The real controls
-          # are the bearer token and the 32-hex sentinel below, both generated
-          # fresh per run and masked. This header is the deliberate "you cannot
-          # reach this by accident" marker, and the caller has to satisfy it.
-          response="$(curl --fail --silent --show-error --request POST --max-time 20 --header "Authorization: Bearer $ACCESS_TOKEN" --header "X-Anchor-Acceptance-Gate: verified" --header "X-Anchor-Synthetic-Sentinel: $SENTINEL" "${DEPLOYMENT_URL%/}/api/_acceptance/sentry")"
+          # It lived at app/api/_acceptance/sentry/route.ts. In the Next.js App
+          # Router an underscore-prefixed folder is a PRIVATE folder, "opting the
+          # folder and all its subfolders out of routing" - so every request 404d
+          # at the framework level, before a single guard condition was evaluated.
+          # The folder has been renamed to app/api/acceptance/, hence the path
+          # below. See the header comment in that file before renaming it back.
+          #
+          # Two real mismatches were found and fixed on the way here, both of
+          # which would have bitten the moment the route became reachable:
+          #   - the acceptance flag was not inlined at build time (fixed in #40)
+          #   - this curl never sent X-Anchor-Acceptance-Gate (fixed in #43)
+          # Neither was the cause of the 404. Both are still required.
+          response="$(curl --fail --silent --show-error --request POST --max-time 20 --header "Authorization: Bearer $ACCESS_TOKEN" --header "X-Anchor-Acceptance-Gate: verified" --header "X-Anchor-Synthetic-Sentinel: $SENTINEL" "${DEPLOYMENT_URL%/}/api/acceptance/sentry")"
           event_id="$(node -e 'const body=JSON.parse(process.argv[1]); if(body.status!=="accepted" || !/^[a-f0-9]{32}$/.test(body.eventId)) process.exit(1); process.stdout.write(body.eventId)' "$response")"
           echo "event_id=$event_id" >> "$GITHUB_OUTPUT"
 

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
 import test from "node:test";
 
 test("health endpoint exposes no user data or secrets", async () => {
@@ -91,7 +91,7 @@ test("Sentry source-map release identity matches runtime events", async () => {
 });
 
 test("synthetic Sentry acceptance route fails closed outside the gated preview", async () => {
-  const route = await readFile("app/api/_acceptance/sentry/route.ts", "utf8");
+  const route = await readFile("app/api/acceptance/sentry/route.ts", "utf8");
   assert.match(route, /NEXT_PUBLIC_ANCHOR_ENV !== "preview"/);
   assert.match(route, /ANCHOR_SMOKE_ACCEPTANCE_ENABLED !== "true"/);
   assert.match(route, /x-anchor-acceptance-gate/);
@@ -106,4 +106,27 @@ test("Cloudflare smoke adapter gates every application request", async () => {
   assert.match(source, /env\.ANCHOR_SMOKE_TOKEN/);
   assert.match(source, /headers\.delete\("authorization"\)/);
   assert.match(source, /return unauthorized\(\)/);
+});
+
+test("no route or page is hidden inside a private underscore folder", async () => {
+  // The acceptance endpoint lived at app/api/_acceptance/sentry/route.ts for
+  // months and 404d every single time it was called. In the Next.js App Router
+  // an underscore-prefixed folder is a PRIVATE folder: it and all its subfolders
+  // are opted out of routing. Nothing errors, nothing warns - the route simply
+  // does not exist, and the failure is indistinguishable from a bad guard.
+  //
+  // This walks app/ and fails if any routable file is parked in one.
+  const offenders = [];
+  async function walk(dir, hidden) {
+    for (const entry of await readdir(dir, { withFileTypes: true })) {
+      const next = `${dir}/${entry.name}`;
+      if (entry.isDirectory()) {
+        await walk(next, hidden || entry.name.startsWith("_"));
+      } else if (hidden && /^(route|page)\.(ts|tsx|js|jsx)$/.test(entry.name)) {
+        offenders.push(next);
+      }
+    }
+  }
+  await walk("app", false);
+  assert.deepEqual(offenders, [], `unroutable files in a private folder: ${offenders.join(", ")}`);
 });

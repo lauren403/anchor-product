@@ -1,3 +1,16 @@
+// WHY THIS FOLDER IS NOT NAMED "_acceptance"
+//
+// It used to be. In the Next.js App Router an underscore-prefixed folder is a
+// PRIVATE folder: "opting the folder and all its subfolders out of routing".
+// So /api/_acceptance/sentry was never a route. Every request 404d at the
+// framework level, before a single line of the guard below was evaluated.
+//
+// That is the whole of the "endpoint returns 404 in acceptance mode" known
+// issue on the v7 beta record, and it is why the synthetic-event and rollback
+// stages were trimmed from the smoke test on 2026-08-04 rather than fixed.
+//
+// Do not rename this folder back. If it needs to read as internal, say so here
+// - the guard below is what keeps it unreachable, not the folder name.
 import * as Sentry from "@sentry/nextjs";
 
 export const dynamic = "force-dynamic";
