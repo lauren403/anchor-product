@@ -1,6 +1,5 @@
 name: Cloudflare acceptance deployment
 
-
 on:
   workflow_dispatch:
     inputs:
@@ -8,15 +7,12 @@ on:
         description: Type DEPLOY_SYNTHETIC_SMOKE_ONLY
         required: true
 
-
 permissions:
   contents: read
-
 
 concurrency:
   group: anchor-cloudflare-private-smoke
   cancel-in-progress: false
-
 
 jobs:
   deploy:
@@ -52,7 +48,6 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
 
-
       - name: Verify reviewed source lineage
         shell: bash
         run: |
@@ -67,10 +62,8 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
 
-
       - name: Install locked dependencies
         run: npm ci --ignore-scripts
-
 
       - name: Generate binding types
         shell: bash
@@ -120,7 +113,6 @@ jobs:
       - name: Validate Cloudflare package without deploying
         run: ./node_modules/.bin/wrangler deploy --dry-run --config wrangler.smoke.jsonc
 
-
       - name: Register isolated workers.dev subdomain
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -162,7 +154,6 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           wranglerVersion: "4.118.0"
           command: deploy --config wrangler.smoke.jsonc --name anchor-private-smoke --var ANCHOR_SMOKE_ACCEPTANCE_ENABLED:true --var NEXT_PUBLIC_ANCHOR_ENV:preview --var NEXT_PUBLIC_RELEASE_SHA:${{ github.sha }} --tag candidate-${{ github.run_id }} --message "Anchor isolated acceptance ${{ github.sha }}"
-
 
       - name: Upload temporary acceptance secrets
         env:
