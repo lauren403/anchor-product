@@ -14,9 +14,18 @@ function unavailable(): Response {
 }
 
 export async function POST(request: Request): Promise<Response> {
+  // The acceptance flag arrives two ways on purpose. Wrangler passes it at
+  // DEPLOY time as a Worker var, which does not reach process.env in this
+  // build, so the gate always failed closed and this endpoint 404d during the
+  // smoke test (deferred known issue on the v7 beta record, 2026-08-04).
+  // The NEXT_PUBLIC_ copy is inlined at BUILD time - the mechanism the health
+  // route already relies on - so it is present at runtime. Either being "true"
+  // is enough; every other condition below is unchanged, so this still fails
+  // closed in beta and production, where neither flag is ever set.
   if (
     process.env.NEXT_PUBLIC_ANCHOR_ENV !== "preview" ||
-    process.env.ANCHOR_SMOKE_ACCEPTANCE_ENABLED !== "true" ||
+    (process.env.NEXT_PUBLIC_ANCHOR_SMOKE_ACCEPTANCE_ENABLED !== "true" &&
+      process.env.ANCHOR_SMOKE_ACCEPTANCE_ENABLED !== "true") ||
     request.headers.get("x-anchor-acceptance-gate") !== "verified"
   ) {
     return unavailable();
