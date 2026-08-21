@@ -24,11 +24,33 @@ jobs:
           - environment: production
             url: ${{ vars.PRODUCTION_HEALTHCHECK_URL }}
     steps:
-      - name: Confirm endpoint configured
+      # An environment with no endpoint configured yet is not an outage.
+      #
+      # This step used to be `test -n "$HEALTH_URL"`, which FAILED the job when
+      # the variable was empty. No repository variables were ever set, so the
+      # workflow failed every 15 minutes and had never once passed in 434 runs.
+      # A monitor that is permanently red is the same as no monitor: a genuine
+      # outage produces exactly the notification everyone has learned to ignore.
+      #
+      # Unconfigured environments are now skipped and raised as a warning, so a
+      # red run means something is actually down.
+      - name: Decide whether this environment is monitored
+        id: target
         env:
           HEALTH_URL: ${{ matrix.url }}
-        run: test -n "$HEALTH_URL"
+          ENVIRONMENT: ${{ matrix.environment }}
+        run: |
+          if [ -z "$HEALTH_URL" ]; then
+            variable="$(printf '%s' "$ENVIRONMENT" | tr '[:lower:]' '[:upper:]')_HEALTHCHECK_URL"
+            echo "monitored=false" >> "$GITHUB_OUTPUT"
+            echo "::warning title=$ENVIRONMENT is not monitored::No health endpoint is configured. Set the $variable repository variable to turn this check on."
+            echo "- **$ENVIRONMENT** - skipped, no endpoint configured" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "monitored=true" >> "$GITHUB_OUTPUT"
+            echo "- **$ENVIRONMENT** - checked" >> "$GITHUB_STEP_SUMMARY"
+          fi
       - name: Check endpoint
+        if: steps.target.outputs.monitored == 'true'
         env:
           HEALTH_URL: ${{ matrix.url }}
         run: |
