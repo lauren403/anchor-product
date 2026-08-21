@@ -36,7 +36,7 @@ jobs:
       - run: npm run test:rendered
       - run: npm audit --omit=dev --audit-level=high
       - run: npm run test:rollback
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: anchor-${{ github.sha }}
           path: dist
