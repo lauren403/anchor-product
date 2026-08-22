@@ -244,7 +244,8 @@ jobs:
           body_file="$RUNNER_TEMP/anchor-acceptance-body"
           status="$(curl --silent --output "$body_file" --write-out '%{http_code}' --request POST --max-time 20 --header "Authorization: Bearer $ACCESS_TOKEN" --header "X-Anchor-Synthetic-Sentinel: $SENTINEL" "$url" || true)"
           response="$(cat "$body_file")"
-          if [ "$status" != "200" ]; then
+          # 202, not 200: route.ts returns Response.json({status:"accepted"},{status:202}).
+          if [ "$status" != "202" ]; then
             echo "::error title=Acceptance endpoint::HTTP $status from /api/acceptance/sentry"
             echo "::notice title=Acceptance response::$(head -c 400 "$body_file")"
             exit 1
