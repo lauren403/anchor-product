@@ -1,8 +1,16 @@
 name: Uptime
 
+# No schedule, deliberately.
+# This monitor has never had an endpoint to check: PREVIEW_HEALTHCHECK_URL,
+# BETA_HEALTHCHECK_URL and PRODUCTION_HEALTHCHECK_URL have never been set.
+# It ran on a */15 cron with a three-job matrix. Actions bills per job,
+# rounded up to a full minute, so this cost three billed minutes every
+# quarter hour to check nothing. On 22 Aug 2026 that exhausted the
+# account's Actions allowance and stopped CI on every private repo.
+#
+# Add a schedule back only once a URL is actually configured, and make it
+# hourly. A beta with no users does not need 96 checks a day.
 on:
-  schedule:
-    - cron: "*/15 * * * *"
   workflow_dispatch:
 
 permissions:
