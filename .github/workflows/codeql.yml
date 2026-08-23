@@ -6,6 +6,7 @@ on:
     branches: [main, beta]
   schedule:
     - cron: "17 2 * * 1"
+  workflow_dispatch:
 
 permissions:
   actions: read
@@ -25,7 +26,63 @@ jobs:
       - uses: github/codeql-action/analyze@v4
         with:
           category: /language:javascript-typescript
-          # This private personal repository does not have GitHub code-scanning
-          # upload enabled. CodeQL still builds the database and runs all queries;
-          # disabling only SARIF upload prevents a plan-level API error.
+          # This is a private repository on a PERSONAL account, and GitHub gates
+          # code scanning for private repos behind Advanced Security, which is
+          # Organizations-only. The repository Security page states this outright:
+          # "Code scanning alerts - Disabled. Advanced Security is only available
+          # for Organizations." So SARIF upload is impossible here, not merely
+          # switched off, and leaving it on produced a run-level error plus eight
+          # warnings while the action retried the upload four times.
+          #
+          # WHY `output` MATTERS: with `upload: never` alone, CodeQL built the
+          # database, ran every query, and then DISCARDED the results. The job went
+          # green regardless of what it found, and nobody could ever read the
+          # findings. A green run meant "the analysis completed", NOT "nothing was
+          # found" - and the release record was citing it as though it meant the
+          # latter. Writing SARIF to a directory and publishing it as a build
+          # artifact makes the findings retrievable without Advanced Security.
           upload: never
+          output: codeql-results
+
+      # Print the findings THEMSELVES on the run page - rule, severity, file, line
+      # and message - not just a count. With no code-scanning alert list to click
+      # through, the run page has to be the report; otherwise reading a result means
+      # downloading and unzipping a SARIF, which is exactly the friction that let a
+      # finding sit unseen in the first place.
+      - name: Summarise CodeQL findings
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          files=(codeql-results/*.sarif)
+          total=0
+          for file in "${files[@]}"; do
+            total=$(( total + $(node scripts/sarif-summary.mjs "$file" --count) ))
+          done
+          echo "CodeQL total findings: $total"
+          {
+            echo "### CodeQL — $total finding(s)"
+            echo
+            if [ "$total" -eq 0 ]; then
+              echo "No results from the JavaScript/TypeScript query suite."
+            else
+              for file in "${files[@]}"; do
+                node scripts/sarif-summary.mjs "$file"
+              done
+            fi
+            echo
+            echo "> Code scanning alerts are unavailable on this plan (Advanced Security is"
+            echo "> Organizations-only), so this summary and the attached SARIF artifact are the"
+            echo "> only places these results exist. **A green run does not by itself mean zero"
+            echo "> findings** — read the table above."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Publish SARIF as a downloadable artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: codeql-sarif-${{ github.sha }}
+          path: codeql-results
+          if-no-files-found: error
+          retention-days: 30

@@ -33,7 +33,12 @@ for (const [name, dsn] of [["NEXT_PUBLIC_SENTRY_DSN", sentryDsn], ["SENTRY_DSN",
   if (!dsn) continue;
   try {
     const url = new URL(dsn);
-    if (url.protocol !== "https:" || !url.hostname.endsWith("sentry.io")) {
+    // NOT endsWith("sentry.io"): that also accepts "evilsentry.io" and
+    // "notsentry.io", because the check has no domain boundary. Flagged by CodeQL
+    // as js/incomplete-url-substring-sanitization. Match the apex exactly, or a
+    // genuine subdomain - real DSNs look like o0.ingest.us.sentry.io.
+    const host = url.hostname.toLowerCase();
+    if (url.protocol !== "https:" || !(host === "sentry.io" || host.endsWith(".sentry.io"))) {
       errors.push(`${name} must be an HTTPS sentry.io DSN.`);
     }
   } catch {
