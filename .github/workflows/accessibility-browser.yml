@@ -43,9 +43,18 @@ jobs:
       - run: npm ci --ignore-scripts
 
       # Playwright is installed here rather than being a devDependency, so `npm ci` in
-      # every other job stays lean. Pinned to match the axe-core version already locked.
-      - name: Install Playwright and Chromium
-        run: npx --yes playwright@1.56.0 install --with-deps chromium
+      # every other job stays lean.
+      #
+      # BOTH lines are needed, and run #1 failed because only the second was here:
+      # `npx playwright install` downloads BROWSER BINARIES but never puts the
+      # `playwright` PACKAGE into node_modules, so scripts/a11y-browser.mjs died on
+      # "Cannot find module 'playwright'". `--no-save` keeps package.json and the
+      # lockfile untouched, which is the whole point of not making it a devDependency.
+      - name: Install the Playwright package
+        run: npm install --no-save playwright@1.56.0
+
+      - name: Install Chromium and its system dependencies
+        run: npx playwright install --with-deps chromium
 
       - name: Build the artifact under test
         run: npm run build
