@@ -27,24 +27,49 @@ const [event, attachments, releaseFiles] = await Promise.all([
 const serialized = JSON.stringify(event);
 assert.ok(!serialized.includes(sentinel), "Synthetic sentinel reached Sentry.");
 assert.equal(event.eventID ?? event.id, eventId, "Sentry returned the wrong event.");
-// DIAGNOSTIC, ADDED 2026-08-23. Acceptance run #20 failed on the assertion below and
-// gave no way to tell WHAT was in the user object, because the workflow deletes the
-// event file straight afterwards and only uploads evidence on success. On a health
-// service the difference between "Sentry attached an ip_address" and "the app sent an
-// identity" is the whole question, so print the SHAPE - key names and value types only,
-// never values - before failing. Values are deliberately not logged: this runs in a
-// public Actions log.
-if (event.user != null) {
-  const shape =
-    typeof event.user === "object"
-      ? Object.entries(event.user)
-          .map(([key, value]) => `${key}:${value === null ? "null" : typeof value}`)
-          .sort()
-          .join(", ")
-      : typeof event.user;
-  console.error(`Sentry event user object present. Keys and value types only: { ${shape} }`);
-}
-assert.ok(event.user == null, "Sentry event contains a user object.");
+// THE USER OBJECT: WHO PUT IT THERE MATTERS MORE THAN WHETHER IT IS THERE
+// ------------------------------------------------------------------------
+// This used to be a flat `assert.ok(event.user == null)`. Acceptance run #21 showed why
+// that is not good enough, and why it can never pass:
+//
+//   { data:null, email:null, geo:object, id:null, ip_address:string, name:null, username:null }
+//
+// Every field the APPLICATION could populate is null. lib/sentry-privacy.ts sets
+// sendDefaultPii:false and its beforeSend does `delete event.user` outright, on all three
+// runtimes. The app sends no user object whatsoever. The ip_address and geo are attached
+// by SENTRY'S INGESTION, derived from the connection that delivered the envelope - the
+// same reason `tags` come back populated after scrubSentryEvent deletes those too.
+//
+// So the old assertion could never go green no matter what the code did, and a gate that
+// can never pass is as useless as one that can never fail. It also blurred the only
+// distinction that matters here: an identity the app leaked is a defect; an IP Sentry
+// recorded is a project setting.
+//
+// These two checks keep it red - correctly - while saying which problem it is.
+const IDENTITY_FIELDS = ["id", "email", "username", "name", "data"];
+const INGEST_FIELDS = ["ip_address", "geo"];
+const user = event.user ?? {};
+
+const leaked = IDENTITY_FIELDS.filter((field) => user[field] != null);
+assert.deepEqual(
+  leaked,
+  [],
+  `THE APPLICATION LEAKED IDENTITY to Sentry: ${leaked.join(", ")}. This is a code defect - ` +
+    "lib/sentry-privacy.ts is supposed to delete event.user before send. Field names only; " +
+    "values are deliberately not printed, this runs in a public log.",
+);
+
+const ingestAttached = INGEST_FIELDS.filter((field) => user[field] != null);
+assert.deepEqual(
+  ingestAttached,
+  [],
+  `Sentry's ingestion attached ${ingestAttached.join(" and ")} to the event. The application ` +
+    "did not send this and cannot remove it: sendDefaultPii is already false and beforeSend " +
+    "already deletes event.user. Fix it in the Sentry project instead - Settings > Security " +
+    "& Privacy > 'Prevent Storing of IP Addresses'. Until that is enabled this check stays " +
+    "red, which is the correct state for a health service storing client IPs and derived " +
+    "geolocation.",
+);
 assert.ok(Array.isArray(event.entries), "Sentry event entries are missing.");
 assert.ok(!event.entries.some((entry) => ["request", "breadcrumbs"].includes(entry.type)));
 assert.ok(Array.isArray(attachments) && attachments.length === 0, "Event has attachments.");
