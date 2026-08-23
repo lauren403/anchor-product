@@ -1,0 +1,54 @@
+name: Accessibility (real browser)
+
+# Colour contrast and computed-ARIA checks, which the jsdom suite cannot do.
+#
+# WHY THIS IS workflow_dispatch AND NOT ON EVERY PUSH
+# ---------------------------------------------------
+# tests/accessibility.test.mjs already runs axe on every push and PR inside the quality
+# gate, and covers most of WCAG A/AA in about a second. What it cannot do is anything
+# needing layout and paint - colour contrast above all - because jsdom does neither.
+#
+# This job closes that gap, but it has to download a Chromium build to do it, which costs
+# roughly a minute of metered Actions time per run. Running it on every push would spend
+# that repeatedly to re-check things that change rarely: a palette, a stylesheet, an ARIA
+# role. So it is on demand, and should be run whenever colours, contrast, focus styles or
+# ARIA attributes change - and before any governed deploy.
+#
+# It earned its place on the first run: it found aria-prohibited-attr (serious) on the
+# onboarding progress dots, where an aria-label on a bare <div> was being silently
+# discarded, leaving screen-reader users with no step indicator at all. The jsdom suite
+# passed clean on the same markup.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    name: axe-core with real layout
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      NEXT_PUBLIC_ANCHOR_ENV: preview
+      NEXT_PUBLIC_RELEASE_SHA: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci --ignore-scripts
+
+      # Playwright is installed here rather than being a devDependency, so `npm ci` in
+      # every other job stays lean. Pinned to match the axe-core version already locked.
+      - name: Install Playwright and Chromium
+        run: npx --yes playwright@1.56.0 install --with-deps chromium
+
+      - name: Build the artifact under test
+        run: npm run build
+
+      - name: Run axe with real layout
+        run: node scripts/a11y-browser.mjs
