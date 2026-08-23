@@ -1,0 +1,87 @@
+{
+  "schema_version": 1,
+  "release_id": "anchor-v7-beta-2026-08-23",
+  "target_environment": "beta",
+  "code": {
+    "repository": "lauren403/anchor-product",
+    "commit": "522bf8f1a31eaede096dc0e4b080a7b5ca0f41cf",
+    "workflow_run": "quality-gate run 32565560193 (success, 2026-08-23)"
+  },
+  "content": {
+    "taxonomy_version": "anchor-moments-v1",
+    "support_library_version": "anchor-supports-v1",
+    "meal_library_version": "anchor-meals-v1",
+    "ecosystem_contract_version": "anchor-ecosystem-v1"
+  },
+  "governance": {
+    "approvals": [
+      {
+        "domain": "clinical",
+        "status": "approved",
+        "reviewer": "release-owner (AMHSW, accredited ED clinician)",
+        "approved_at": "2026-08-20",
+        "evidence_ref": "internal clinical review 2026-08-20, external sign-off record held by the release owner - Anchor v7 beta content and framing; no diagnosis, no clinical advice, lived-experience material de-identified. Reviewed at commit 5062201. Every commit since is CI, workflow, routing and test-harness only: no taxonomy, support, meal or ecosystem version changed, so the reviewed material is byte-identical at this commit."
+      },
+      {
+        "domain": "nutrition",
+        "status": "approved",
+        "reviewer": "independent dietitian review",
+        "approved_at": "2026-08-20",
+        "evidence_ref": "independent dietitian review 2026-08-20, external sign-off record held by the release owner - meals and nutrition claims evidence-bounded; no treats-ADHD or diet-culture framing. Reviewed at commit 5062201. meal_library_version anchor-meals-v1 is unchanged at this commit, so the reviewed material is byte-identical."
+      },
+      {
+        "domain": "privacy",
+        "status": "approved",
+        "reviewer": "release-owner",
+        "approved_at": "2026-08-20",
+        "evidence_ref": "Privacy review 2026-08-20, external sign-off record held by the release owner, extended by the release owner on 2026-08-22 to cover PR #44. Device-local storage; Sentry PII scrubbing verified by operations.test; AU-appropriate monitoring. NO REAL IDENTITY TRANSMITTED. PR #44 made /api/acceptance/sentry routable for the first time; that route calls Sentry setUser with a deliberately synthetic identity (id is the request sentinel, email is <sentinel>@invalid.example, a reserved non-routable TLD). Verified at this commit: the route is pinned to NEXT_PUBLIC_ANCHOR_ENV === 'preview' at build time so beta and production builds contain no live route; it reads request headers only and never parses a request body; and it is additionally gated by a smoke-acceptance build flag, a bearer-token gate worker, and an anchor-smoke-[a-f0-9]{32} sentinel format check. RESIDUAL RISK ACCEPTED: the preview pin is build-time inlined, so it is a build-configuration guarantee rather than a runtime one. SEPARATE NOTE ADDED 2026-08-23: the beta rehearsal worker's HTTP Basic gate does not cover /assets/*, by deliberate design (routing static files through the wrapper 404s the app's JS and CSS). Hashed asset filenames are only discoverable via the gated HTML, so exposure is low, but the gate is not a complete access control and should be described that way to reviewers."
+      },
+      {
+        "domain": "first_nations",
+        "status": "approved",
+        "reviewer": "release-owner, First Nations-led",
+        "approved_at": "2026-08-20",
+        "evidence_ref": "First Nations-led cultural review 2026-08-20, external sign-off record held by the release owner - Anchor v7 beta content and claims. Reviewed at commit 5062201. No cultural content, community claim or content version changed at this commit, so the reviewed material is byte-identical."
+      },
+      {
+        "domain": "accessibility",
+        "status": "pending",
+        "reviewer": "",
+        "approved_at": "",
+        "evidence_ref": "PENDING - AND THE CITED AUTOMATED EVIDENCE DOES NOT EXIST. VERIFIED 2026-08-23 BY EXHAUSTIVE SEARCH: this repository contains NO automated accessibility tooling of any kind. Zero matches for wcag, axe, axe-core, pa11y, lighthouse or accessib across all eight workflow files; zero such packages in dependencies or devDependencies; no eslint-plugin-jsx-a11y; nothing in tests/ or scripts/. The 'Cloudflare acceptance deployment' workflow, which both this record and the approved anchor-v7-beta-2026-08-04 record cite as the source of automated WCAG results, does not test accessibility at all - its steps are source-lineage verification, build, source-map handling, gate and health contract, one synthetic Sentry event, event inspection, and a provider rollback drill. CONSEQUENCE: the approved 2026-08-04 record's accessibility evidence, 'zero automated WCAG A/AA violations in acceptance run', describes a result no workflow in this repository has ever produced. That claim should be treated as unsupported, not merely stale. This domain cannot be approved on automated evidence until such evidence is actually generated. Suggested minimum: eslint-plugin-jsx-a11y wired into the existing lint step (static, cheap, catches a large class of defects in JSX), plus axe-core run against the rendered HTML the existing rendered-html tests already produce via worker.fetch. SEPARATELY, the human half: issue #12 requires an INDEPENDENT review including disabled and ADHD user testing; the release owner stated on 2026-08-23 that this is a self-imposed standard rather than a regulatory one, social work not being an Ahpra-registered profession, and that the bar may be lowered. That is a legitimate release-owner decision. It does not substitute for the automated half, which is simply absent. This matters more here than on most products: Anchor is built for disabled and neurodivergent users."
+      },
+      {
+        "domain": "security",
+        "status": "approved",
+        "reviewer": "automated security suite + release-owner",
+        "approved_at": "2026-08-23",
+        "evidence_ref": "Approved by the release owner 2026-08-23 on the same basis as the anchor-v7-beta-2026-08-04 record ('automated security suite + release-owner'), against evidence that is now retrievable rather than assumed. EVIDENCE, ALL VERIFIED AGAINST LIVE RUNS: (1) Quality gate - SUCCESS in CI on this commit lineage: run 32565560193 on 522bf8f, and again on main at b97ef8b, c5c758e and a5b8ada, each 2/2 green. Covers validate:config, lint, typecheck, 8/8 unit tests, build, 16/16 rendered tests, npm audit --omit=dev --audit-level=high, and the artifact rollback drill. (2) npm audit --omit=dev --audit-level=high: 0 vulnerabilities. (3) Dependabot ENABLED, 8 open alerts - undici x5, image-size x2, esbuild x1 - ALL development scope; none reaches production. (4) CodeQL: 0 findings, READ FROM A TABLE rather than inferred from a green tick. PR #49 changed codeql.yml to write SARIF via 'output:' and render rule, severity, file, line and message into the run summary. Its first run reported 1 finding and its second 2, both since fixed: js/incomplete-url-substring-sanitization in scripts/validate-config.mjs, where hostname.endsWith('sentry.io') accepted evilsentry.io, notsentry.io and xsentry.io (now an exact-or-subdomain match), and js/incomplete-sanitization in scripts/sarif-summary.mjs, where pipes were escaped before backslashes. CodeQL on main at a5b8ada reports 0. STANDING LIMITATION, ACCEPTED: code scanning alerts remain unavailable - Advanced Security is Organizations-only and this is a private repo on a personal account - so the run summary and the SARIF build artifact are the only places results exist. Every run page now states this. A green CodeQL run does not by itself mean zero findings; this approval rests on the table reading zero, not on the tick. FURTHER NOTE: the 'dependency review' workflow does not run dependency-review-action - its body is the same npm audit the quality gate runs, on a pull_request-only trigger that cannot fire on main. It is now documented as such in the file itself and must not be counted as an independent line of evidence."
+      }
+    ]
+  },
+  "verification": {
+    "quality_workflow": "pass - run 32565560193 on this commit, 2026-08-23, workflow_dispatch on main, success in 1m10s, artifact published",
+    "dependency_review": "not-run on this commit and NOT RUNNABLE on main - the workflow is pull_request-only. Its body is npm audit --omit=dev --audit-level=high, which the quality gate above ran and passed. Recorded honestly rather than as an independent pass.",
+    "codeql": "pass with 0 findings, retrievable - run 122 on main at c5c758e and the run on a5b8ada both report 'CodeQL - 0 finding(s)' in the job summary, with full SARIF published as a build artifact. Code scanning alerts remain unavailable (Advanced Security is Organizations-only), so the summary and artifact are the only places results exist; this is stated on every run page. Two real findings were surfaced and fixed on the way here - see the security approval evidence.",
+    "rollback_drill": "pass - exercised inside quality-gate run 32565560193 on this commit, and locally on 2026-08-22. Tars dist/, records a sha256, verifies the checksum, extracts to a clean directory, parses .openai/hosting.json and imports the restored Worker to confirm default.fetch is a function.",
+    "uptime_check": "pending-until-deploy",
+    "monitoring_smoke_test": "pending-until-deploy"
+  },
+  "risk": {
+    "known_issues": [
+      "RESOLVED 2026-08-22 (PR #47), STILL UNVERIFIED END TO END: Sentry.init never ran on the Cloudflare Worker, so the app had NO server-side error monitoring and POST /api/acceptance/sentry returned 503 delivery_failed. Root cause: instrumentation.ts gated the Sentry import on process.env.NEXT_RUNTIME being 'nodejs' or 'edge' - a stock-Next.js convention. Proven twice that nothing sets it here: zero matches for NEXT_RUNTIME across all 740 files of vinext@0.0.50, and dist/server/index.js reading it exactly twice and assigning it zero times. The gate was removed. The password-gated beta rehearsal deployed 2026-08-23 from this commit carries the fix, but a gated acceptance run returning 202 with an event id is still required to confirm delivery end to end.",
+      "OPEN, EVIDENCE INTEGRITY: three separate green signals on this project have meant less than their labels - eight of ten operations tests asserted that code had been WRITTEN (regex over source strings) rather than that it worked, and two real defects survived weeks behind them (fixed by the behavioural tests in PR #48); the 'dependency review' workflow is a duplicate npm audit on a trigger that excludes main; and CodeQL passes while its findings are discarded. None of these was dishonest when introduced, but the release record has been citing them as independent evidence. A pending PR addresses the latter two.",
+      "OPEN: the Uptime workflow has no schedule and no configured healthcheck endpoints. PREVIEW_/BETA_/PRODUCTION_HEALTHCHECK_URL have never been set, and no environment has a stable URL to point them at. uptime_check cannot be satisfied until a governed deploy exists. The schedule was removed in PR #46 after a */15 cron with a three-job matrix exhausted the account's GitHub Actions allowance on 2026-08-22.",
+      "OPEN, NOT A DEFECT - SCOPE OBSERVATION: the built route table is one page ('/') plus /api/health and /api/acceptance/sentry, both of which exist only for CI to call. Zero files import db/; db/schema.ts declares no tables; there are no server actions and no dynamic route segments. The D1 binding, drizzle and the database are unused starter scaffolding. A local-first single-page app is carrying a Worker, a pre-0.1 shim, an image optimiser, an unused database, an acceptance gate worker and a smoke harness. Worth deciding deliberately rather than inheriting.",
+      "OPEN, LOW: actions/upload-artifact@v4 targets Node 20, which is deprecated and force-run on Node 24. Dependabot PR #4 proposes the bump."
+    ],
+    "rollback_ref": "none-initial-beta",
+    "rollback_owner": "release-owner"
+  },
+  "decision": {
+    "status": "draft",
+    "release_owner": "release-owner",
+    "approved_at": "",
+    "notes": "Supersedes the anchor-v7-beta-2026-09-01 draft, which was pinned at 706ecaf and named for the GitHub Actions allowance reset. That reset is no longer the constraint: a $10 Actions budget was set on 2026-08-23 and CI now runs. This record pins 522bf8f, the current head of main, which carries the nanoid remediation (#41), the acceptance-route fix (#44), the smoke instrumentation (#45), the Uptime schedule removal (#46), the Sentry NEXT_RUNTIME fix (#47) and the behavioural endpoint tests (#48). REVIEW DATE VS COMMIT DATE: the human reviews are dated 2026-08-20, when main stood at 5062201. Every commit since is CI, workflow, routing and test-harness only, changing no content version, so clinical, nutrition and First Nations material is byte-identical here. Privacy is recorded on a separate basis, having been extended on 2026-08-22 to cover PR #44. SECURITY IS NOW APPROVED (2026-08-23) against evidence that is retrievable rather than assumed - see its evidence field; two real CodeQL findings were surfaced and fixed in the process. ACCESSIBILITY REMAINS PENDING, and for a substantive reason rather than a procedural one: verified by exhaustive search on 2026-08-23, this repository contains NO automated accessibility tooling at all - no axe, no pa11y, no Lighthouse, no eslint-plugin-jsx-a11y, nothing in any of the eight workflows or in any dependency. The 'automated WCAG' evidence cited by the approved 2026-08-04 record therefore describes a result that has never been produced here. That is not something the release owner can approve away; the check has to be built before it can pass. This record must stay a DRAFT until accessibility is resolved; deploy.yml fails closed on a draft, which is the intended behaviour. Note that a password-gated beta rehearsal is already live at anchor-beta-rehearsal.mobmind-anchor.workers.dev from this commit - that path deliberately requires no release record, and this record governs only the ungated deploy."
+  }
+}
