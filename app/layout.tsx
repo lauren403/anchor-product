@@ -11,6 +11,10 @@ export const metadata: Metadata = {
   description:
     "A private, low-shame ADHD wellbeing tool developed by Body Belonging Clinic.",
   applicationName: "Anchor",
+  // External beta is blocked pending clinical, APD, privacy, First Nations governance,
+  // lived-experience/accessibility, intended-purpose and independent security review.
+  // Keep Anchor out of search results until those gates are cleared.
+  robots: { index: false, follow: false },
   manifest: "/manifest.webmanifest",
   other: { "codex-preview": "development" },
   icons: { icon: "/icon.svg", shortcut: "/icon.svg" },
