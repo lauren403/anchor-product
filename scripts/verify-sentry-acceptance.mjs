@@ -219,7 +219,48 @@ assert.ok(
     "key Sentry returned, which is what tells you whether this check is looking in the wrong " +
     "place again or whether symbolication genuinely is not happening.",
 );
-assert.ok(!(event.errors ?? []).some((error) => /source.?map/i.test(error.type ?? error.message ?? "")));
+// SENTRY'S OWN PROCESSING ERRORS.
+//
+// This assertion is older than tonight and had never once been reached: the release-files
+// check above it failed first on every run that got this far. Run #29 reached it and it
+// fired - as a bare assert.ok with no message, printing only "The expression evaluated to
+// a falsy value". A gate that fails without saying what it found is the exact failure this
+// project keeps digging out, so it now names them.
+//
+// Types only, never messages: a Sentry processing error message can quote a file path or
+// a URL, and this runs in a log anyone with repository access can read.
+// Print EVERY processing-error type first, not only the ones the filter below catches.
+// That filter is /source.?map/i, which matches "invalid_source_map" but NOT, for example,
+// "js_no_source" - so on its own it would show a partial picture and invite a partial
+// conclusion. What is fatal stays exactly as it was; what is visible does not.
+const allErrorTypes = [
+  ...new Set((event.errors ?? []).map((error) => String(error.type ?? "untyped"))),
+].sort();
+if (allErrorTypes.length > 0) {
+  console.error(`Sentry processing errors on this event, types only: ${allErrorTypes.join(", ")}`);
+}
+
+const sourceMapErrors = (event.errors ?? []).filter((error) =>
+  /source.?map/i.test(error.type ?? error.message ?? ""),
+);
+if (sourceMapErrors.length > 0) {
+  const types = [...new Set(sourceMapErrors.map((error) => String(error.type ?? "untyped")))].sort();
+  console.error(
+    `Sentry recorded ${sourceMapErrors.length} source-map processing error(s), types only: ${types.join(", ")}`,
+  );
+}
+
+// Kept fatal deliberately. Run #29 showed 5 of 10 frames resolving to source while Sentry
+// still logged a source-map error, so something in this build is shipping without a usable
+// map. Softening a check before knowing what it caught is how the geo residual came to be
+// pinned to a shape that was never measured. Read the types printed above, then decide
+// whether they are benign - do not relax this line to make the run green.
+assert.equal(
+  sourceMapErrors.length,
+  0,
+  "Sentry logged source-map processing errors for this event - see the types printed above. " +
+    "Some part of this release symbolicates and some does not.",
+);
 
 const evidence = {
   schemaVersion: 1,
