@@ -102,6 +102,15 @@ jobs:
 
       - name: Validate environment configuration
         run: npm run validate:config -- --environment "${{ inputs.target_environment }}"
+        # Run #1 failed here reporting NEXT_PUBLIC_SENTRY_DSN and SENTRY_DSN missing, while
+        # "Enforce deploy boundary" above had just proved all four secrets were present. This
+        # step had no env block, so validate-config.mjs read an empty environment and could
+        # never pass for beta or production, whatever was configured. Same shape as the step
+        # below, which has always had one.
+        env:
+          NEXT_PUBLIC_RELEASE_SHA: ${{ steps.record.outputs.target_commit }}
+          NEXT_PUBLIC_SENTRY_DSN: ${{ secrets.NEXT_PUBLIC_SENTRY_DSN }}
+          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
 
       - name: Validate, test and build the approved release
         env:
