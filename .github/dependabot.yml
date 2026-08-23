@@ -16,6 +16,43 @@ updates:
       development-minor-patch:
         dependency-type: development
         update-types: [minor, patch]
+
+    # THREE MAJOR-VERSION PRs SAT RED FOR WEEKS. Triaged 2026-08-23 by checking the
+    # actual constraints rather than assuming, because "close it, it's a major" is how
+    # a real upgrade gets thrown away alongside two impossible ones.
+    #
+    #   eslint 9 -> 10 (PR #7)      BLOCKED, pinned below.
+    #   @types/node 22 -> 26 (#9)   WRONG BY DESIGN, pinned below.
+    #   lucide-react 0.x -> 1.x (#8) SAFE. Not pinned - it should be merged.
+    #
+    # The lucide finding is recorded here because it is the one that would otherwise be
+    # lost: verified against lucide-react@1.28.0 by installing it and running the gate.
+    # All 40 icons imported by components/anchor/LegacyAnchorApp.jsx and
+    # components/anchor/MomentFinder.tsx are present in its type declarations, its React
+    # peer range covers the installed React 19.2.8, lint was clean, and the unit tier
+    # passed. tsc reported the same two pre-existing errors before and after, so the bump
+    # changes nothing there either.
+    ignore:
+      # eslint 10 is blocked by exactly one package, and it is one this repository made
+      # load-bearing on 2026-08-23: eslint-plugin-jsx-a11y@6.10.2 declares
+      # `peerDependencies.eslint: ^3 || ^4 || ^5 || ^6 || ^7 || ^8 || ^9` - no ^10. The
+      # 31 accessibility rules it enables are promoted to errors in eslint.config.mjs and
+      # are part of the accessibility approval evidence, so it cannot simply be dropped.
+      #
+      # Everything else in the chain is already ready: eslint-config-next@16.2.12 asks for
+      # eslint >=9.0.0, and @typescript-eslint@8.59.3 and eslint-plugin-react-hooks@7.1.1
+      # both accept ^10.0.0. Lift this pin the moment jsx-a11y ships eslint 10 support.
+      - dependency-name: eslint
+        update-types: [version-update:semver-major]
+
+      # @types/node must track the runtime, not the newest release. .nvmrc pins Node
+      # 22.13.0 and the Actions runners use it via node-version-file. Types for Node 26
+      # would describe APIs that do not exist at runtime, so typecheck would pass on code
+      # that fails in production - the exact failure shape this project keeps finding.
+      # Minor and patch updates within 22.x still come through.
+      - dependency-name: "@types/node"
+        update-types: [version-update:semver-major]
+
   - package-ecosystem: github-actions
     directory: /
     schedule:
