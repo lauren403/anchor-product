@@ -74,18 +74,58 @@ if (user.geo != null && typeof user.geo === "object") {
 }
 
 const ingestAttached = INGEST_FIELDS.filter((field) => user[field] != null);
+
+// ip_address must stay gone. The org setting Security & Privacy > 'Prevent Storing of IP
+// Addresses' was enabled 2026-08-23 and cleared it. If it returns, that setting was turned off.
+assert.ok(
+  user.ip_address == null,
+  "Sentry stored an ip_address again. The org setting Security & Privacy > 'Prevent Storing " +
+    "of IP Addresses' cleared this on 2026-08-23 - check whether it has been turned off.",
+);
+
+// GEO IS AN ACCEPTED, UNREMOVABLE RESIDUAL - AND THIS IS NOT A SOFTENED ASSERTION.
+//
+// Sentry attaches geo during INGESTION, after data-scrubbing rules run. Proven, not assumed:
+// an org-level Advanced Data Scrubbing rule [Remove] [Anything] from [$user.geo] was added
+// 2026-08-23, and acceptance runs #24 and #25 - fifteen minutes apart, both well past any
+// config-propagation window - still received geo. Nothing in Sentry's settings reaches it, and
+// the application cannot either (sendDefaultPii is false, beforeSend deletes event.user).
+//
+// The release owner accepted this residual on 2026-08-23 having been shown the measurement,
+// not a description of it. What is stored is COUNTRY AND REGION ONLY, confirmed twice: the
+// Sentry UI on a real event reads "Geography: United States (US)", and runs #24 and #25 both
+// printed { country_code:string, region:string }. No city, no suburb, no coordinates.
+//
+// So this check gets STRICTER, not looser. It pins geo to exactly those two keys and fails the
+// moment Sentry stores anything more. A permanently-red gate teaches people to ignore it; this
+// one goes green on the known state and objects the instant that state changes.
+const ACCEPTED_GEO_KEYS = ["country_code", "region"];
+if (user.geo != null) {
+  assert.equal(
+    typeof user.geo,
+    "object",
+    "Sentry's geo is no longer an object. The accepted residual was a two-key object.",
+  );
+  const unexpectedGeo = Object.keys(user.geo)
+    .filter((key) => user.geo[key] != null && !ACCEPTED_GEO_KEYS.includes(key))
+    .sort();
+  assert.deepEqual(
+    unexpectedGeo,
+    [],
+    `Sentry is now storing MORE location than was accepted: ${unexpectedGeo.join(", ")}. The ` +
+      "accepted residual is country_code and region only. A city, a postcode or coordinates is a " +
+      "new decision for the release owner, not a regression to wave through. Field names only; " +
+      "values are never printed, this runs in a public log.",
+  );
+}
+
+// Anything ingest-attached that is neither the cleared ip_address nor the accepted geo.
+const unaccounted = ingestAttached.filter((field) => field !== "geo");
 assert.deepEqual(
-  ingestAttached,
+  unaccounted,
   [],
-  `Sentry's ingestion attached ${ingestAttached.join(" and ")} to the event. The application ` +
-    "did not send this and cannot remove it: sendDefaultPii is already false and beforeSend " +
-    "already deletes event.user outright. WHICH FIX APPLIES DEPENDS ON THE FIELD, and this " +
-    "message used to name only the first: ip_address is cleared by the org setting Security & " +
-    "Privacy > 'Prevent Storing of IP Addresses', which was enabled on 2026-08-23 and did " +
-    "clear it. THAT SETTING DOES NOT CLEAR geo - Sentry keeps the location it derived before " +
-    "it stopped storing the address it derived it from, verified on acceptance run #22. geo " +
-    "needs an Advanced Data Scrubbing rule removing $user.geo. See the geo shape printed " +
-    "above for the granularity actually being stored.",
+  `Sentry's ingestion attached ${unaccounted.join(" and ")}, which is neither the ip_address that ` +
+    "was cleared nor the geo residual that was accepted. This is new and unexamined.",
 );
 assert.ok(Array.isArray(event.entries), "Sentry event entries are missing.");
 assert.ok(!event.entries.some((entry) => ["request", "breadcrumbs"].includes(entry.type)));
