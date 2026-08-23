@@ -223,30 +223,57 @@ jobs:
           # Neither was the cause of the 404. Both are still required.
           url="${DEPLOYMENT_URL%/}/api/acceptance/sentry"
           
-          # DIAGNOSTIC PROBES.
-          # This stage 404d on three consecutive deploys with every documented
-          # precondition satisfied, so stop letting --fail hide the answer. These three
-          # probes separate the possibilities: if GET on the acceptance path also 404s
-          # while GET /api/health returns 200, the app is routing but this route is not
-          # registered; if POST 404s and GET does not, the adapter is refusing the
-          # method; if all three are 200 then the guard itself is rejecting.
-          for probe_method in GET POST; do
-            probe_status="$(curl --silent --output /dev/null --write-out '%{http_code}' --max-time 20 --request "$probe_method" --header "Authorization: Bearer $ACCESS_TOKEN" --header "X-Anchor-Synthetic-Sentinel: $SENTINEL" "$url" || true)"
-            echo "::notice title=acceptance probe::$probe_method /api/acceptance/sentry -> $probe_status"
-          done
-          health_probe="$(curl --silent --output /dev/null --write-out '%{http_code}' --max-time 20 --header "Authorization: Bearer $ACCESS_TOKEN" "${DEPLOYMENT_URL%/}/api/health" || true)"
-          echo "::notice title=acceptance probe::GET /api/health -> $health_probe"
-          
-          # The real call. X-Anchor-Acceptance-Gate is deliberately NOT sent here.
-          # smoke/worker.ts validates the bearer token, strips authorization, and sets
-          # that header itself before forwarding. It is the gate's proof of passage,
-          # not something a caller may assert - #43 had this wrong.
-          body_file="$RUNNER_TEMP/anchor-acceptance-body"
-          status="$(curl --silent --output "$body_file" --write-out '%{http_code}' --request POST --max-time 20 --header "Authorization: Bearer $ACCESS_TOKEN" --header "X-Anchor-Synthetic-Sentinel: $SENTINEL" "$url" || true)"
-          response="$(cat "$body_file")"
+          # THE REAL CALL, AND WHY IT RETRIES.
+          #
+          # X-Anchor-Acceptance-Gate is deliberately NOT sent here. smoke/worker.ts
+          # validates the bearer token, strips authorization, and sets that header itself
+          # before forwarding. It is the gate's proof of passage, not something a caller
+          # may assert - #43 had this wrong.
+          #
           # 202, not 200: route.ts returns Response.json({status:"accepted"},{status:202}).
+          # This asserted 200 from #45 onward and never fired a false failure only because
+          # the endpoint returned 503 before reaching its success path - so the bug would
+          # have surfaced the moment Sentry started working and reported the fix as broken.
+          #
+          # RETRIES, added 2026-08-23. Runs #23 and #27 both failed here with a 404 while
+          # every documented precondition held. #27 was re-run on the IDENTICAL commit,
+          # nothing changed, and returned 202; a local rebuild with the same acceptance
+          # environment showed the compiled Worker gate reduced to the header check alone,
+          # so the build was never the problem. This is the throwaway Worker not having
+          # finished propagating. Turning that into a red gate and a failure email is how a
+          # real signal gets trained into noise. The Sentry event fetch below already
+          # retries for exactly this reason; this call had no such allowance.
+          #
+          # Only a non-202 is retried, so a successful call is never repeated and no second
+          # synthetic event is ever captured.
+          body_file="$RUNNER_TEMP/anchor-acceptance-body"
+          status=""
+          for attempt in $(seq 1 8); do
+            status="$(curl --silent --output "$body_file" --write-out '%{http_code}' --request POST --max-time 20 --header "Authorization: Bearer $ACCESS_TOKEN" --header "X-Anchor-Synthetic-Sentinel: $SENTINEL" "$url" || true)"
+            if [ "$status" = "202" ]; then
+              if [ "$attempt" -gt 1 ]; then
+                echo "::notice title=Acceptance endpoint::answered 202 on attempt $attempt - the worker needed time to propagate"
+              fi
+              break
+            fi
+            echo "::notice title=Acceptance retry::attempt $attempt returned $status"
+            if [ "$attempt" -lt 8 ]; then sleep 5; fi
+          done
+          response="$(cat "$body_file")"
+
           if [ "$status" != "202" ]; then
-            echo "::error title=Acceptance endpoint::HTTP $status from /api/acceptance/sentry"
+            # DIAGNOSTIC PROBES, on the failing path only so a green run stays quiet.
+            # These separate the possibilities: if GET on the acceptance path also 404s
+            # while GET /api/health returns 200, the app is routing but this route is not
+            # registered; if POST 404s and GET does not, the adapter is refusing the
+            # method; if all three answer then the guard itself is rejecting.
+            for probe_method in GET POST; do
+              probe_status="$(curl --silent --output /dev/null --write-out '%{http_code}' --max-time 20 --request "$probe_method" --header "Authorization: Bearer $ACCESS_TOKEN" --header "X-Anchor-Synthetic-Sentinel: $SENTINEL" "$url" || true)"
+              echo "::notice title=acceptance probe::$probe_method /api/acceptance/sentry -> $probe_status"
+            done
+            health_probe="$(curl --silent --output /dev/null --write-out '%{http_code}' --max-time 20 --header "Authorization: Bearer $ACCESS_TOKEN" "${DEPLOYMENT_URL%/}/api/health" || true)"
+            echo "::notice title=acceptance probe::GET /api/health -> $health_probe"
+            echo "::error title=Acceptance endpoint::HTTP $status from /api/acceptance/sentry after 8 attempts over ~35s"
             echo "::notice title=Acceptance response::$(head -c 400 "$body_file")"
             exit 1
           fi
@@ -316,7 +343,7 @@ jobs:
           NODE
 
       - name: Upload redacted acceptance evidence
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v4
         with:
           name: anchor-cloudflare-acceptance-${{ github.sha }}
           path: |
