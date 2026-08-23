@@ -27,6 +27,23 @@ const [event, attachments, releaseFiles] = await Promise.all([
 const serialized = JSON.stringify(event);
 assert.ok(!serialized.includes(sentinel), "Synthetic sentinel reached Sentry.");
 assert.equal(event.eventID ?? event.id, eventId, "Sentry returned the wrong event.");
+// DIAGNOSTIC, ADDED 2026-08-23. Acceptance run #20 failed on the assertion below and
+// gave no way to tell WHAT was in the user object, because the workflow deletes the
+// event file straight afterwards and only uploads evidence on success. On a health
+// service the difference between "Sentry attached an ip_address" and "the app sent an
+// identity" is the whole question, so print the SHAPE - key names and value types only,
+// never values - before failing. Values are deliberately not logged: this runs in a
+// public Actions log.
+if (event.user != null) {
+  const shape =
+    typeof event.user === "object"
+      ? Object.entries(event.user)
+          .map(([key, value]) => `${key}:${value === null ? "null" : typeof value}`)
+          .sort()
+          .join(", ")
+      : typeof event.user;
+  console.error(`Sentry event user object present. Keys and value types only: { ${shape} }`);
+}
 assert.ok(event.user == null, "Sentry event contains a user object.");
 assert.ok(Array.isArray(event.entries), "Sentry event entries are missing.");
 assert.ok(!event.entries.some((entry) => ["request", "breadcrumbs"].includes(entry.type)));
