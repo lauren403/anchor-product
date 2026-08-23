@@ -72,7 +72,16 @@ const navItems = [
 
 function Brand() {
   return (
-    <div className="brand" aria-label="Anchor by Body Belonging Clinic">
+    // No aria-label here, deliberately. It used to carry
+    // aria-label="Anchor by Body Belonging Clinic" on a bare <div>, which axe flagged in a
+    // real browser as "aria-label attribute is not well supported on a div with no valid
+    // role attribute" - screen readers disagree about whether such a label overrides the
+    // element's own text, so the announcement was unpredictable.
+    //
+    // The right fix is to remove it rather than invent a role to justify it: the visible
+    // text below already says exactly the same words, and the decorative mark is correctly
+    // hidden. Nothing is lost, and what is announced is now the same everywhere.
+    <div className="brand">
       <span className="brand-mark" aria-hidden="true">h</span>
       <span><strong>Anchor</strong><small>by Body Belonging Clinic</small></span>
     </div>
@@ -113,7 +122,22 @@ function Onboarding({ onFinish }) {
     <main className="onboarding-shell">
       <div className="onboarding-card">
         <Brand />
-        <div className="progress-dots" aria-label={`Step ${step + 1} of ${slides.length}`}>
+        {/*
+          role="img" is load-bearing, not decoration. A bare <div> has an implicit role of
+          "generic", and aria-label is PROHIBITED on generic - so this label was being
+          silently discarded and screen-reader users were told nothing about which
+          onboarding step they were on. Found 2026-08-23 by axe-core running in a real
+          browser (aria-prohibited-attr, serious); jsdom did not surface it, because
+          resolving it needs computed ARIA semantics.
+
+          role="img" makes the dot cluster one named object, so the label is announced
+          once and the individual spans are not read out separately.
+        */}
+        <div
+          className="progress-dots"
+          role="img"
+          aria-label={`Step ${step + 1} of ${slides.length}`}
+        >
           {slides.map((_, index) => <span key={index} className={index === step ? 'active' : ''} />)}
         </div>
         <div className="onboarding-content">
