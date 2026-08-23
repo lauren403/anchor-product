@@ -59,16 +59,33 @@ assert.deepEqual(
     "values are deliberately not printed, this runs in a public log.",
 );
 
+// Acceptance run #22, after 'Prevent Storing of IP Addresses' was enabled org-wide:
+// ip_address is GONE, geo REMAINS. Sentry keeps the location it derived before it stopped
+// storing the address it derived it from. How much that matters depends entirely on the
+// granularity - a country code is close to nothing, a city on a mental-health tool is not -
+// and nothing in the log said which. So print geo's SHAPE too: nested key names and value
+// types, never values. "city:string" and "city:null" are the two answers that matter.
+if (user.geo != null && typeof user.geo === "object") {
+  const geoShape = Object.entries(user.geo)
+    .map(([key, value]) => `${key}:${value === null ? "null" : typeof value}`)
+    .sort()
+    .join(", ");
+  console.error(`Sentry geo object shape (keys and value types only): { ${geoShape} }`);
+}
+
 const ingestAttached = INGEST_FIELDS.filter((field) => user[field] != null);
 assert.deepEqual(
   ingestAttached,
   [],
   `Sentry's ingestion attached ${ingestAttached.join(" and ")} to the event. The application ` +
     "did not send this and cannot remove it: sendDefaultPii is already false and beforeSend " +
-    "already deletes event.user. Fix it in the Sentry project instead - Settings > Security " +
-    "& Privacy > 'Prevent Storing of IP Addresses'. Until that is enabled this check stays " +
-    "red, which is the correct state for a health service storing client IPs and derived " +
-    "geolocation.",
+    "already deletes event.user outright. WHICH FIX APPLIES DEPENDS ON THE FIELD, and this " +
+    "message used to name only the first: ip_address is cleared by the org setting Security & " +
+    "Privacy > 'Prevent Storing of IP Addresses', which was enabled on 2026-08-23 and did " +
+    "clear it. THAT SETTING DOES NOT CLEAR geo - Sentry keeps the location it derived before " +
+    "it stopped storing the address it derived it from, verified on acceptance run #22. geo " +
+    "needs an Advanced Data Scrubbing rule removing $user.geo. See the geo shape printed " +
+    "above for the granularity actually being stored.",
 );
 assert.ok(Array.isArray(event.entries), "Sentry event entries are missing.");
 assert.ok(!event.entries.some((entry) => ["request", "breadcrumbs"].includes(entry.type)));
