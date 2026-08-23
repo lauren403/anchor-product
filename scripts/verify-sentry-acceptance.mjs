@@ -130,7 +130,12 @@ assert.deepEqual(
 assert.ok(Array.isArray(event.entries), "Sentry event entries are missing.");
 assert.ok(!event.entries.some((entry) => ["request", "breadcrumbs"].includes(entry.type)));
 assert.ok(Array.isArray(attachments) && attachments.length === 0, "Event has attachments.");
-assert.ok(Array.isArray(releaseFiles) && releaseFiles.length > 0, "Release has no source-map artifacts.");
+// The legacy release-artifacts endpoint is reported, NOT asserted on. See the
+// symbolication check further down for why: it answers the wrong question.
+console.error(
+  `Legacy release-files endpoint listed ${Array.isArray(releaseFiles) ? releaseFiles.length : "a non-array"} ` +
+    "artifact(s). This is a diagnostic only - debug-ID artifact bundles do not appear here.",
+);
 
 const tags = new Map((event.tags ?? []).map((tag) => [tag.key, tag.value]));
 assert.equal(tags.get("environment"), "preview", "Unexpected Sentry environment.");
@@ -149,6 +154,71 @@ assert.ok(
 );
 const frames = exceptions.flatMap((exception) => exception.stacktrace?.frames ?? []);
 assert.ok(frames.length > 0, "Sentry event has no diagnostic stack frames.");
+
+// DOES THIS EVENT ACTUALLY SYMBOLICATE?
+// -------------------------------------
+// This replaces `assert.ok(releaseFiles.length > 0, "Release has no source-map artifacts.")`,
+// which asked the wrong question and took two runs to be seen doing it.
+//
+// That assertion read /api/0/projects/{org}/{project}/releases/{version}/files/ - the
+// LEGACY release-artifacts endpoint. Modern sentry-cli uploads DEBUG-ID ARTIFACT BUNDLES,
+// which that endpoint does not list. On runs #27 and #28 the build log said
+// "Successfully uploaded source maps to Sentry" three times, once per build environment,
+// while that endpoint reported nothing at all. getsentry/sentry-cli#2071 is the same
+// report from someone else. The artifact-bundles API is undocumented and moves, so this
+// does not chase it.
+//
+// What matters was never whether an admin endpoint lists files. It is whether a stack
+// trace arriving in Sentry is READABLE - the property source maps actually buy, and the
+// one thing an endpoint quirk cannot fake.
+//
+// Three independent markers, any one of which means a frame resolved to real source. The
+// Sentry web API and the ingest envelope name these differently, so all three are checked
+// rather than guessed at:
+//   - frame.context      (web API) an array of [lineNo, text] pairs Sentry resolved
+//   - frame.context_line (envelope) the resolved source line
+//   - a source-file extension on the filename, rather than a hashed /assets/*.js bundle
+// A minified frame has none of them.
+const SOURCE_FILE = /\.(ts|tsx|mts|cts|jsx|mjs|cjs)(\?|$)/;
+
+function frameResolvedToSource(frame) {
+  if (Array.isArray(frame.context) && frame.context.length > 0) return true;
+  if (typeof frame.context_line === "string" && frame.context_line.length > 0) return true;
+  return SOURCE_FILE.test(String(frame.filename ?? frame.absPath ?? frame.abs_path ?? ""));
+}
+
+// Counts and key names only - never a filename, never a line of source. This runs in a
+// log anyone with repository access can read, and the same rule that governs the geo
+// shape line governs this one.
+console.error(
+  "Sentry frame shape (counts and key names only): " +
+    JSON.stringify({
+      frames: frames.length,
+      withContext: frames.filter((frame) => Array.isArray(frame.context) && frame.context.length > 0).length,
+      // Same length>0 condition the resolver uses. An earlier draft counted any string
+      // here, so a frame carrying context_line:"" was reported as having a context line
+      // while the verdict said otherwise - a diagnostic that contradicts its own gate is
+      // worse than no diagnostic.
+      withContextLine: frames.filter(
+        (frame) => typeof frame.context_line === "string" && frame.context_line.length > 0,
+      ).length,
+      withSourceExtension: frames.filter((frame) =>
+        SOURCE_FILE.test(String(frame.filename ?? frame.absPath ?? frame.abs_path ?? "")),
+      ).length,
+      inApp: frames.filter((frame) => frame.inApp === true || frame.in_app === true).length,
+      keys: [...new Set(frames.flatMap((frame) => Object.keys(frame)))].sort(),
+    }),
+);
+
+const resolved = frames.filter(frameResolvedToSource).length;
+assert.ok(
+  resolved > 0,
+  `Not one of the ${frames.length} stack frames on this event resolved to source. Source maps ` +
+    "either did not reach Sentry or did not match this release, so a real crash would arrive " +
+    "minified and unreadable. Read the frame shape printed immediately above: it names every " +
+    "key Sentry returned, which is what tells you whether this check is looking in the wrong " +
+    "place again or whether symbolication genuinely is not happening.",
+);
 assert.ok(!(event.errors ?? []).some((error) => /source.?map/i.test(error.type ?? error.message ?? "")));
 
 const evidence = {
@@ -167,7 +237,11 @@ const evidence = {
   diagnostics: {
     exceptionTypePreserved: true,
     stackFramesPresent: true,
-    sourceMapArtifactsPresent: true,
+    // Was `sourceMapArtifactsPresent`, which recorded the answer to the wrong question.
+    // This records what was actually established: frames on a real event resolved to
+    // source, which is what symbolication means in practice.
+    framesResolvedToSource: resolved,
+    framesTotal: frames.length,
     sourceMapErrorsAbsent: true,
   },
 };
