@@ -11,9 +11,21 @@ export const metadata: Metadata = {
   description:
     "A private, low-shame ADHD wellbeing tool developed by Body Belonging Clinic.",
   applicationName: "Anchor",
-  // External beta is blocked pending clinical, APD, privacy, First Nations governance,
-  // lived-experience/accessibility, intended-purpose and independent security review.
-  // Keep Anchor out of search results until those gates are cleared.
+  // Anchor is not publicly deployed. The only running instance is a password-gated
+  // beta rehearsal on a workers.dev URL; there has never been a governed production
+  // deploy. Until there is one, and until the release owner decides to launch
+  // publicly, Anchor must not appear in search results.
+  //
+  // This replaces an earlier note saying the external beta was "blocked pending
+  // clinical, APD, privacy, First Nations governance, lived-experience/accessibility,
+  // intended-purpose and independent security review". Those reviews are complete:
+  // release record anchor-v7-beta-2026-08-23 records all six governance domains as
+  // approved and passes `npm run validate:release -- --require-approved`. The comment
+  // was left stale and contradicted the record, which is exactly the kind of
+  // disagreement that makes a reader distrust both.
+  //
+  // The DIRECTIVE below is unchanged and deliberate: governance being complete is not
+  // the same as being live. Keep it until production go-live is an explicit decision.
   robots: { index: false, follow: false },
   manifest: "/manifest.webmanifest",
   other: { "codex-preview": "development" },
