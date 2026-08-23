@@ -30,7 +30,16 @@ for (const run of sarif.runs ?? []) {
       rule: rule.name ?? result.ruleId ?? "(unknown rule)",
       id: result.ruleId ?? "",
       where: line ? `${uri}:${line}` : uri,
-      message: (result.message?.text ?? "").replace(/\s+/g, " ").replace(/\|/g, "\\|").trim(),
+      // Escape backslashes BEFORE pipes: doing it the other way round turns the
+      // backslash this adds into an escape for the wrong character, and a message
+      // containing a literal backslash can then break out of the table cell.
+      // Flagged by CodeQL as js/incomplete-sanitization on this very file, which is
+      // a fair demonstration that the summary works.
+      message: (result.message?.text ?? "")
+        .replace(/\s+/g, " ")
+        .replace(/\\/g, "\\\\")
+        .replace(/\|/g, "\\|")
+        .trim(),
     });
   }
 }
