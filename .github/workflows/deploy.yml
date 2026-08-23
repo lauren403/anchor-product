@@ -190,26 +190,8 @@ jobs:
         shell: bash
         env:
           DEPLOYMENT_URL: ${{ steps.deploy.outputs.deployment-url }}
-        run: |
-          set -euo pipefail
-          # /api/health is served by the Worker, so it proves only that the Worker is up.
-          # Deploy Anchor #2 passed it perfectly while every /assets/* request returned 503
-          # and the page never rendered at all. A deploy gate that cannot tell a working app
-          # from a white screen is not a gate. So: fetch the real page and prove the assets
-          # it references actually serve.
-          base="${DEPLOYMENT_URL%/}"
-          html="$(curl --fail --silent --show-error --location --max-time 20 "$base/")"
-          paths="$(printf '%s' "$html" | grep -o '/assets/[A-Za-z0-9._-]*' | sort -u || true)"
-          test -n "$paths" || { echo "::error::The rendered page referenced no /assets/ files."; exit 1; }
-          failed=0
-          for path in $paths; do
-            code="$(curl -s -o /dev/null -w '%{http_code}' --location --max-time 20 "$base$path")"
-            if [ "$code" = "200" ]; then
-              echo "ok    $path"
-            else
-              echo "::error::$path returned $code"
-              failed=1
-            fi
-          done
-          test "$failed" -eq 0 || { echo "::error::The deployed page cannot load its own assets."; exit 1; }
-          echo "Every asset referenced by the rendered page served 200."
+        # The logic lives in scripts/deployed-asset-check.mjs, not inline here, so that
+        # tests/deployed-asset-check.test.mjs can prove it FAILS on the exact deploy that
+        # shipped on 2026-08-23: page renders, /api/health perfect, every asset 503. A
+        # gate nobody has watched fail is a gate nobody should trust.
+        run: node scripts/deployed-asset-check.mjs
