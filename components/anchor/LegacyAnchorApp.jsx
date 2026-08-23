@@ -610,7 +610,7 @@ function More({ state, reset }) {
       <section>
         <div className="section-heading"><div><p className="eyebrow">If things feel hard</p><h2>Reach a real person</h2></div></div>
         <div className="support-grid">{supportLinks.map((link) => <a key={link.label} href={link.href} className="support-card"><div><strong>{link.label}</strong><span>{link.detail}</span></div><b>{link.phone}</b></a>)}</div>
-        <a className="button primary full" href="https://www.halaxy.com/profile/ms-lauren-lynch/social-worker/1772313" target="_blank" rel="noreferrer">Book a free Body Belonging intro call <ExternalLink size={17} /></a>
+        <a className="button primary full" href="https://clientportal.zandahealth.com/clientportal/bodybelongingclinic/appointment-booking" target="_blank" rel="noreferrer">Book a free Body Belonging intro call <ExternalLink size={17} /></a>
       </section>
 
       <section className="settings-card privacy-section">
