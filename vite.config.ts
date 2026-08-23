@@ -3,6 +3,7 @@ import { defineConfig } from "vite";
 import { sentryVitePlugin } from "@sentry/vite-plugin";
 import hostingConfig from "./.openai/hosting.json" with { type: "json" };
 import { sites } from "./build/sites-vite-plugin.ts";
+import { nodeEnvForVite } from "./build/build-node-env.ts";
 
 const SITE_CREATOR_PLACEHOLDER_DATABASE_ID =
   "00000000-0000-4000-8000-000000000000";
@@ -34,7 +35,21 @@ const localBindingConfig = {
     : [],
 };
 
-export default defineConfig(async () => {
+export default defineConfig(async ({ command, mode }) => {
+  // NODE_ENV MUST BE CORRECT BEFORE THE PLUGINS ARRAY IS BUILT, NOT AFTER.
+  //
+  // @sentry/vite-plugin reads process.env.NODE_ENV once, at construction, to decide whether
+  // it may create a release and upload source maps. vinext sets NODE_ENV for a build in its
+  // own `config` hook - which Vite cannot call until this factory has already returned. The
+  // Sentry plugin was therefore being constructed under NODE_ENV="development" during every
+  // production build, and silently uploaded nothing. See build/build-node-env.ts for the
+  // full account and the evidence.
+  //
+  // This assigns the value vinext resolves anyway; only the timing changes.
+  // @types/node declares NODE_ENV read-only. The narrow cast is the write being made
+  // deliberately and visibly, rather than hidden behind `as any`.
+  (process.env as { NODE_ENV?: string }).NODE_ENV = nodeEnvForVite(command, mode);
+
   // Keep Wrangler and Miniflare state project-local. These are non-secret tool
   // settings; application environment belongs in ignored `.env*` files.
   process.env.WRANGLER_WRITE_LOGS ??= "false";
@@ -86,7 +101,15 @@ export default defineConfig(async () => {
               sourcemaps: {
                 filesToDeleteAfterUpload: ["./dist/**/*.map"],
               },
-              silent: true,
+              // NOT silent. `silent: true` is what let the dev-mode misfire above run
+              // unnoticed for the entire life of this configuration: the plugin logged
+              // exactly what it was doing, and the log was thrown away. If an upload
+              // fails, this build should say so out loud.
+              //
+              // Deliberately not `debug: true`: debug sets SENTRY_LOG_LEVEL=debug on the
+              // sentry-cli child process, and these logs are readable by anyone with
+              // repository access. Info and warnings are enough to notice a failure.
+              silent: false,
             }),
           ]
         : []),
