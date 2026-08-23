@@ -1,7 +1,30 @@
 name: Dependency review
 
+# WHAT THIS ACTUALLY DOES - read before citing it as evidence.
+#
+# Despite the name, this workflow does NOT run GitHub's dependency-review-action.
+# It runs one command:
+#
+#     npm audit --omit=dev --audit-level=high
+#
+# That is the SAME command the quality gate already runs. It is duplicated here
+# deliberately so a pull request gets an independent production-dependency check
+# even if the quality gate is skipped or cancelled - but it is one check reported
+# under two names, not two independent lines of evidence, and the release record
+# must not cite it as the latter.
+#
+# WHY NOT THE REAL ACTION: dependency-review-action diffs the base and head
+# dependency graphs through GitHub's dependency review API, which - like code
+# scanning - requires Advanced Security on a private repository, and Advanced
+# Security is Organizations-only. This repo is private on a personal account, so
+# the real action cannot run here at all.
+#
+# WHAT REAL DEPENDENCY EVIDENCE EXISTS: `npm audit --omit=dev --audit-level=high`
+# returning 0, plus Dependabot alerts, which ARE enabled on this repository.
+
 on:
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
