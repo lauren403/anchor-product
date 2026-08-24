@@ -75,12 +75,23 @@ if (user.geo != null && typeof user.geo === "object") {
 
 const ingestAttached = INGEST_FIELDS.filter((field) => user[field] != null);
 
-// ip_address must stay gone. The org setting Security & Privacy > 'Prevent Storing of IP
-// Addresses' was enabled 2026-08-23 and cleared it. If it returns, that setting was turned off.
+// ip_address must be gone, OR be the one placeholder the application now sends on purpose.
+//
+// lib/sentry-privacy.ts stopped deleting event.user and started setting
+// { ip_address: "0.0.0.0" } instead, to deny Relay's geo lookup an input it can resolve.
+// So exactly one non-null value is legitimate here and every other one is a regression.
+// The org setting Security & Privacy > 'Prevent Storing of IP Addresses', enabled
+// 2026-08-23, may still null it out entirely - either outcome is fine.
+//
+// This is the narrowest form of the check, not a softened one: any real address, any
+// partial, any "{{auto}}" left unresolved still fails, and fails loudly.
+const NON_GEOLOCATABLE_IP = "0.0.0.0";
 assert.ok(
-  user.ip_address == null,
-  "Sentry stored an ip_address again. The org setting Security & Privacy > 'Prevent Storing " +
-    "of IP Addresses' cleared this on 2026-08-23 - check whether it has been turned off.",
+  user.ip_address == null || user.ip_address === NON_GEOLOCATABLE_IP,
+  "Sentry stored an ip_address that is neither absent nor the deliberate " +
+    `${NON_GEOLOCATABLE_IP} placeholder. Either scrubSentryEvent stopped running, or the org ` +
+    "setting Security & Privacy > 'Prevent Storing of IP Addresses' was turned off. The value " +
+    "is not printed - this runs in a log anyone with repository access can read.",
 );
 
 // GEO IS AN ACCEPTED, UNREMOVABLE RESIDUAL - AND THIS IS NOT A SOFTENED ASSERTION.
@@ -119,8 +130,14 @@ if (user.geo != null) {
   );
 }
 
-// Anything ingest-attached that is neither the cleared ip_address nor the accepted geo.
-const unaccounted = ingestAttached.filter((field) => field !== "geo");
+// Anything ingest-attached that is neither the accepted geo nor the ip_address already
+// accounted for above - which is now either absent or the deliberate 0.0.0.0 placeholder,
+// both already asserted. Without this second exclusion the placeholder would trip this
+// line as "new and unexamined" the moment it started being sent, which is the opposite of
+// the truth.
+const unaccounted = ingestAttached.filter(
+  (field) => field !== "geo" && field !== "ip_address",
+);
 assert.deepEqual(
   unaccounted,
   [],
