@@ -260,6 +260,35 @@ if (allErrorTypes.length > 0) {
 const sourceMapErrors = (event.errors ?? []).filter((error) =>
   /source.?map/i.test(error.type ?? error.message ?? ""),
 );
+
+// WHICH FILES FAILED - path only, never the origin and never a query string.
+//
+// Run #30 reported five js_invalid_sourcemap_location errors against ten frames, and
+// nothing said WHICH five. Without that, the only options are to guess or to leave a real
+// defect standing, and a guess is what produced the wrong lead about debug IDs: a grep for
+// the literal string "debugId" reported 2 of 17 built files carrying one, when in fact 15
+// of 17 carry the injected `_sentryDebugIdIdentifier` runtime snippet. The grep was wrong,
+// not the build.
+//
+// These are static asset paths from a throwaway smoke Worker - build output, not anything
+// a person typed. The origin and any query string are still dropped, because the rule that
+// values never reach this log does not get relaxed just because it is inconvenient.
+if (sourceMapErrors.length > 0) {
+  const paths = [
+    ...new Set(
+      sourceMapErrors.map((error) => {
+        const raw = String(error.url ?? error.abs_path ?? error.absPath ?? "");
+        if (!raw) return "(no path on the error)";
+        try {
+          return new URL(raw).pathname;
+        } catch {
+          return raw.split("?")[0];
+        }
+      }),
+    ),
+  ].sort();
+  console.error(`Source-map errors were raised against these paths: ${paths.join(", ")}`);
+}
 if (sourceMapErrors.length > 0) {
   const types = [...new Set(sourceMapErrors.map((error) => String(error.type ?? "untyped")))].sort();
   console.error(
