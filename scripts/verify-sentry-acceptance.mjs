@@ -291,24 +291,53 @@ function pathLikeValue(value) {
   }
 }
 
+/** Every path-like string anywhere in a value, to a bounded depth. No guessed field names. */
+function collectPaths(value, depth = 0, found = []) {
+  if (depth > 3 || value == null) return found;
+  if (typeof value === "string") {
+    const path = pathLikeValue(value);
+    if (path) found.push(path);
+    return found;
+  }
+  if (Array.isArray(value)) {
+    for (const item of value) collectPaths(item, depth + 1, found);
+    return found;
+  }
+  if (typeof value === "object") {
+    for (const item of Object.values(value)) collectPaths(item, depth + 1, found);
+  }
+  return found;
+}
+
 if (sourceMapErrors.length > 0) {
   console.error(
     "Source-map error object keys (names only): " +
       JSON.stringify([...new Set(sourceMapErrors.flatMap((error) => Object.keys(error)))].sort()),
   );
 
-  // Any value on any of those keys that reads as an asset path, origin and query dropped.
-  // Anything that does not look like a path is reported as its type and never its content -
-  // the rule that values do not reach this log holds even while chasing a defect.
-  const paths = [
+  // Run #33 measured the shape as { data, message, type } with `data` an OBJECT - so the
+  // path was nested one level below where the previous scan looked. Rather than reach for
+  // `error.data.url` and risk a fourth wrong field name, this walks the whole error to a
+  // bounded depth and reports the nested key names too. Follow the shape; do not guess it.
+  const nestedKeys = [
     ...new Set(
       sourceMapErrors.flatMap((error) =>
-        Object.values(error)
-          .map((value) => pathLikeValue(value))
-          .filter((value) => value !== null),
+        Object.entries(error).flatMap(([key, value]) =>
+          value && typeof value === "object" && !Array.isArray(value)
+            ? Object.keys(value).map((inner) => `${key}.${inner}`)
+            : [],
+        ),
       ),
     ),
   ].sort();
+  if (nestedKeys.length > 0) {
+    console.error(`Nested keys on those errors (names only): ${JSON.stringify(nestedKeys)}`);
+  }
+
+  // Any value on any of those keys that reads as an asset path, origin and query dropped.
+  // Anything that does not look like a path is reported as its type and never its content -
+  // the rule that values do not reach this log holds even while chasing a defect.
+  const paths = [...new Set(sourceMapErrors.flatMap((error) => collectPaths(error)))].sort();
   console.error(
     paths.length > 0
       ? `Source-map errors name these paths: ${paths.join(", ")}`
