@@ -10,10 +10,68 @@ test("health endpoint exposes no user data or secrets", async () => {
 });
 
 test("monitoring strips identity, breadcrumbs, contexts, query and fragment data", async () => {
-  const source = await readFile("lib/sentry-privacy.ts", "utf8");
-  for (const expected of ["delete event.user", "delete event.request", "delete event.breadcrumbs", "delete event.contexts", "delete event.message", "delete exception.value", "delete span.description", "sendDefaultPii: false", "enableLogs: false"]) {
-    assert.ok(source.includes(expected), `Missing monitoring privacy control: ${expected}`);
+  // THIS TEST USED TO READ THE SOURCE AND ASSERT IT CONTAINED THE STRING "delete event.user".
+  //
+  // That is the "check that the code was written" pattern this repository keeps digging out,
+  // and on 2026-08-24 it did exactly what that pattern always does. lib/sentry-privacy.ts
+  // stopped deleting event.user and started setting { ip_address: "0.0.0.0" } instead - a
+  // STRONGER privacy control, because deleting the field let Sentry's ingestion fill an IP
+  // back in and derive a location from it. The old test would have failed that improvement
+  // and passed a change that deleted the user object while leaking through some other field.
+  // It was testing the spelling, not the behaviour.
+  //
+  // So it now runs the scrubber and looks at what comes out.
+  const { scrubSentryEvent, privacySafeSentryOptions, NON_GEOLOCATABLE_IP } = await import(
+    "../lib/sentry-privacy.ts"
+  );
+
+  const scrubbed = scrubSentryEvent({
+    user: { id: "u1", email: "someone@example.com", username: "someone", name: "Some One",
+            ip_address: "203.0.113.9", geo: { city: "Nedlands", country_code: "AU" } },
+    request: { url: "https://example.test/?moment=x", cookies: { s: "1" } },
+    breadcrumbs: [{ message: "x" }],
+    contexts: { response: { body: "x" } },
+    extra: { outcome: "x" },
+    message: "x",
+    fingerprint: ["x"],
+    server_name: "worker-1",
+    transaction_info: { source: "url" },
+    tags: { barrier: "x" },
+    exception: { values: [{ type: "TypeError", value: "x" }] },
+    spans: [{ description: "x", data: { a: 1 }, tags: { b: 2 } }],
+  });
+
+  // Identity: gone. Every field an application could populate.
+  for (const field of ["id", "email", "username", "name", "data", "geo"]) {
+    assert.equal(scrubbed.user?.[field], undefined, `event.user.${field} survived the scrubber`);
   }
+
+  // The IP is not merely removed - it is REPLACED. Removing it leaves the field for
+  // Sentry's ingestion to fill in from the connection, which is how acceptance runs #24
+  // to #30 came back carrying a country, a region, and on #27 a city.
+  assert.equal(scrubbed.user?.ip_address, NON_GEOLOCATABLE_IP);
+  assert.notEqual(scrubbed.user?.ip_address, "203.0.113.9");
+
+  for (const field of ["request", "breadcrumbs", "contexts", "extra", "message",
+                       "fingerprint", "server_name", "transaction_info", "tags"]) {
+    assert.equal(scrubbed[field], undefined, `event.${field} survived the scrubber`);
+  }
+
+  assert.equal(scrubbed.exception.values[0].value, undefined, "exception value survived");
+  assert.equal(scrubbed.exception.values[0].type, "TypeError", "exception type must be kept");
+  assert.equal(scrubbed.spans[0].description, undefined);
+  assert.equal(scrubbed.spans[0].data, undefined);
+  assert.equal(scrubbed.spans[0].tags, undefined);
+
+  // Options read from the function, not grepped out of the file.
+  const options = privacySafeSentryOptions();
+  assert.equal(options.sendDefaultPii, false);
+  assert.equal(options.enableLogs, false);
+  assert.equal(options.beforeBreadcrumb(), null, "breadcrumbs must be dropped at the source");
+
+  // A negative source check is a different thing from asserting code was written: there is
+  // no behaviour to observe for an integration that must never be imported at all.
+  const source = await readFile("lib/sentry-privacy.ts", "utf8");
   assert.doesNotMatch(source, /replayIntegration|feedbackIntegration|localStorage\.getItem|sessionStorage\.getItem/i);
 });
 
