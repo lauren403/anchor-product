@@ -354,16 +354,56 @@ if (sourceMapErrors.length > 0) {
   );
 }
 
-// Kept fatal deliberately. Run #29 showed 5 of 10 frames resolving to source while Sentry
-// still logged a source-map error, so something in this build is shipping without a usable
-// map. Softening a check before knowing what it caught is how the geo residual came to be
-// pinned to a shape that was never measured. Read the types printed above, then decide
-// whether they are benign - do not relax this line to make the run green.
-assert.equal(
-  sourceMapErrors.length,
-  0,
-  "Sentry logged source-map processing errors for this event - see the types printed above. " +
-    "Some part of this release symbolicates and some does not.",
+// WHAT THE FIVE ERRORS ACTUALLY WERE, AND WHY THIS IS NOT A SOFTENED ASSERTION
+// ----------------------------------------------------------------------------
+// This was `assert.equal(sourceMapErrors.length, 0)`, held deliberately fatal across runs
+// #29 to #34 on the grounds that a check should not be relaxed before you know what it
+// caught. Run #34 finally said what it caught. Every one of the five errors named a single
+// file:
+//
+//     Nested keys: ["data.column","data.row","data.source","data.symbolicator_type"]
+//     Source-map errors name these paths: worker.js
+//
+// `worker.js` is not ours. This repository never emits a file by that name - checked, it
+// appears nowhere in the build output. It is what WRANGLER compiles `main` down to at
+// DEPLOY time: ./smoke/worker.ts here, ./beta/worker.ts in beta. That happens after vite
+// and the Sentry plugin have finished, so no map for it was ever generated, uploaded, or
+// could be. Sentry is reporting, correctly, that it cannot symbolicate a file nobody gave
+// it a map for.
+//
+// So the split is exactly 5 and 5 for a good reason: five frames are Anchor's own code and
+// they resolve, carrying origFilename, origFunction and map; five are the wrangler entry
+// wrapper and never will. The old assertion demanded a source map for a file this build
+// does not produce - unachievable, which makes it a permanently-red gate, and a
+// permanently-red gate teaches people to ignore the gate.
+//
+// This replacement is STRICTER where it counts. It does not count errors; it attributes
+// them. Any source-map error naming a file that is not the wrangler entry wrapper fails,
+// by name. An error whose path cannot be read at all fails too, because an error that
+// cannot be attributed cannot be excused.
+const WRANGLER_ENTRY_BASENAMES = ["worker.js"];
+
+const unattributable = [];
+for (const error of sourceMapErrors) {
+  const paths = collectPaths(error);
+  if (paths.length === 0) {
+    unattributable.push("(an error carrying no readable path)");
+    continue;
+  }
+  for (const path of paths) {
+    const basename = path.split("/").pop();
+    if (!WRANGLER_ENTRY_BASENAMES.includes(basename)) unattributable.push(path);
+  }
+}
+
+assert.deepEqual(
+  [...new Set(unattributable)].sort(),
+  [],
+  "Sentry could not find a source map for a file this build DOES ship maps for: " +
+    `${[...new Set(unattributable)].sort().join(", ")}. The only source-map errors this gate ` +
+    `excuses are for the wrangler entry wrapper (${WRANGLER_ENTRY_BASENAMES.join(", ")}), which ` +
+    "wrangler compiles at deploy time and which therefore has no map by construction. " +
+    "Anything else means Anchor's own code stopped symbolicating.",
 );
 
 const evidence = {
@@ -387,7 +427,9 @@ const evidence = {
     // source, which is what symbolication means in practice.
     framesResolvedToSource: resolved,
     framesTotal: frames.length,
-    sourceMapErrorsAbsent: true,
+    // Not "absent" - attributed. Errors for the wrangler entry wrapper are expected and
+    // excused by name; an error for any file this build ships a map for fails the run.
+    sourceMapErrorsAttributedToWranglerEntry: sourceMapErrors.length,
   },
 };
 
