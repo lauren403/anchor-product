@@ -273,21 +273,50 @@ const sourceMapErrors = (event.errors ?? []).filter((error) =>
 // These are static asset paths from a throwaway smoke Worker - build output, not anything
 // a person typed. The origin and any query string are still dropped, because the rule that
 // values never reach this log does not get relaxed just because it is inconvenient.
+// Run #32 printed "(no path on the error)": url, abs_path and absPath were all absent.
+// Three guessed field names, three misses. So this stops guessing the field and reports
+// the SHAPE first - exactly the move that settled the geo question and the frame question.
+const PATH_LIKE = /^[\w@./-]+\.(js|mjs|cjs|ts|tsx|map)$/;
+
+/** A string worth printing: an asset path, and nothing else. */
+function pathLikeValue(value) {
+  const raw = String(value ?? "");
+  if (!raw) return null;
+  try {
+    const { pathname } = new URL(raw);
+    return pathname;
+  } catch {
+    const withoutQuery = raw.split("?")[0];
+    return PATH_LIKE.test(withoutQuery) ? withoutQuery : null;
+  }
+}
+
 if (sourceMapErrors.length > 0) {
+  console.error(
+    "Source-map error object keys (names only): " +
+      JSON.stringify([...new Set(sourceMapErrors.flatMap((error) => Object.keys(error)))].sort()),
+  );
+
+  // Any value on any of those keys that reads as an asset path, origin and query dropped.
+  // Anything that does not look like a path is reported as its type and never its content -
+  // the rule that values do not reach this log holds even while chasing a defect.
   const paths = [
     ...new Set(
-      sourceMapErrors.map((error) => {
-        const raw = String(error.url ?? error.abs_path ?? error.absPath ?? "");
-        if (!raw) return "(no path on the error)";
-        try {
-          return new URL(raw).pathname;
-        } catch {
-          return raw.split("?")[0];
-        }
-      }),
+      sourceMapErrors.flatMap((error) =>
+        Object.values(error)
+          .map((value) => pathLikeValue(value))
+          .filter((value) => value !== null),
+      ),
     ),
   ].sort();
-  console.error(`Source-map errors were raised against these paths: ${paths.join(", ")}`);
+  console.error(
+    paths.length > 0
+      ? `Source-map errors name these paths: ${paths.join(", ")}`
+      : "No value on any source-map error read as an asset path. Value types present: " +
+          JSON.stringify([
+            ...new Set(sourceMapErrors.flatMap((error) => Object.values(error).map((v) => typeof v))),
+          ].sort()),
+  );
 }
 if (sourceMapErrors.length > 0) {
   const types = [...new Set(sourceMapErrors.map((error) => String(error.type ?? "untyped")))].sort();
