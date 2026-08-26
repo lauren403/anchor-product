@@ -56,6 +56,7 @@ import {
   supportLinks,
   toolDetails,
 } from './content'
+import { learnSeries, learnCards } from './learn-content'
 import { formatTime, getNextMoment, useAnchorStore } from './store'
 import { localId } from './store'
 import { MomentFinder } from './MomentFinder'
@@ -67,6 +68,7 @@ const navItems = [
   { id: 'explore', label: 'Explore', icon: Compass },
   { id: 'plan', label: 'My plan', icon: CalendarDays },
   { id: 'checkin', label: 'Check in', icon: HeartPulse },
+  { id: 'learn', label: 'Learn', icon: BookOpen },
   { id: 'more', label: 'More', icon: Menu },
 ]
 
@@ -294,6 +296,20 @@ function Today({ state, onOpen, onNavigate }) {
           })}
         </div>
       </section>
+
+      {learnSeries.length > 0 && (() => {
+        const featured = learnSeries[new Date().getDate() % learnSeries.length]
+        return (
+          <section>
+            <button className="feature-card learn-today-card" onClick={() => onNavigate('learn')}>
+              <span className="mini-label">A gentle read</span>
+              <strong>{featured.title}</strong>
+              <span className="learn-today-sub">{featured.sub}</span>
+              <span className="card-link">Open Learn <ChevronRight size={16} /></span>
+            </button>
+          </section>
+        )
+      })()}
 
       <section className="program-strip">
         <div><p className="eyebrow">Guided company</p><h2>You do not have to start alone.</h2></div>
@@ -594,6 +610,78 @@ function ChoiceGroup({ label, help, value, onChange, options }) {
   )
 }
 
+function Learn() {
+  const [openSeries, setOpenSeries] = useState(null)
+  const [openCard, setOpenCard] = useState(null)
+
+  if (openCard) {
+    const card = learnCards.find((c) => c.id === openCard)
+    const series = learnSeries.find((s) => s.id === card.set)
+    return (
+      <div className="view-stack learn-view">
+        <button className="text-button learn-back" onClick={() => setOpenCard(null)}><ArrowLeft size={16} /> {series ? series.title : 'Back'}</button>
+        <section className="learn-card-full">
+          <p className="eyebrow">{card.tag}</p>
+          <h1>{card.gist}</h1>
+          {card.body.map((para, i) => <p key={i} className="learn-body">{para}</p>)}
+          {card.safety && card.care && (
+            <div className="learn-care"><p className="eyebrow">A gentle word</p><p>{card.care}</p></div>
+          )}
+          <div className="learn-help"><p className="eyebrow">What can gently help</p><p>{card.help}</p></div>
+          <div className="learn-talk"><p className="eyebrow">Worth a conversation</p><p>{card.talk}</p></div>
+          {card.safety && (
+            <section className="learn-support">
+              <div className="section-heading"><div><p className="eyebrow">If things feel hard</p><h2>Reach a real person</h2></div></div>
+              <div className="support-grid">{supportLinks.map((link) => <a key={link.label} href={link.href} className="support-card"><div><strong>{link.label}</strong><span>{link.detail}</span></div><b>{link.phone}</b></a>)}</div>
+              <a className="button primary full" href="https://www.halaxy.com/profile/ms-lauren-lynch/social-worker/1772313" target="_blank" rel="noreferrer">Book a free Body Belonging intro call <ExternalLink size={17} /></a>
+            </section>
+          )}
+          <p className="learn-honesty">{card.honesty}</p>
+        </section>
+      </div>
+    )
+  }
+
+  if (openSeries) {
+    const series = learnSeries.find((s) => s.id === openSeries)
+    const cards = learnCards.filter((c) => c.set === openSeries)
+    return (
+      <div className="view-stack learn-view">
+        <button className="text-button learn-back" onClick={() => setOpenSeries(null)}><ArrowLeft size={16} /> All series</button>
+        <section className="page-intro"><p className="eyebrow">A gentle series</p><h1>{series.title}</h1><p className="lead">{series.sub}</p></section>
+        <section className="learn-card-list">
+          {cards.map((card) => (
+            <button key={card.id} className="learn-card" onClick={() => setOpenCard(card.id)}>
+              <span className="learn-card-tag">{card.tag}{card.safety && <em className="learn-flag">care</em>}</span>
+              <strong>{card.gist}</strong>
+              <span className="card-link">Open <ChevronRight size={16} /></span>
+            </button>
+          ))}
+        </section>
+      </div>
+    )
+  }
+
+  return (
+    <div className="view-stack learn-view">
+      <section className="page-intro"><p className="eyebrow">Gentle, evidence-honest, ED-safe</p><h1>Learn</h1><p className="lead">Short reads about your ADHD brain across its hormonal seasons — across a month, and across a life. Never medical advice; always a person you can reach.</p></section>
+      <section className="learn-series-list">
+        {learnSeries.map((series) => {
+          const count = learnCards.filter((c) => c.set === series.id).length
+          return (
+            <button key={series.id} className="learn-series-card" onClick={() => setOpenSeries(series.id)}>
+              <span className="learn-series-mark"><BookOpen size={19} /></span>
+              <strong>{series.title}</strong>
+              <small>{series.sub}</small>
+              <em>{count} cards <ChevronRight size={15} /></em>
+            </button>
+          )
+        })}
+      </section>
+    </div>
+  )
+}
+
 function More({ state, reset }) {
   const [confirmReset, setConfirmReset] = useState(false)
   function exportData() {
@@ -790,6 +878,7 @@ export default function App() {
         {tab === 'explore' && <Explore state={state} onOpen={setActiveTool} onFavourite={toggleFavourite} onToggleFuel={toggleFuel} onToggleMeal={toggleMeal} />}
         {tab === 'plan' && <Plan state={state} update={update} onToggleFuel={toggleFuel} onToggleMeal={toggleMeal} onOpen={setActiveTool} />}
         {tab === 'checkin' && <CheckIn state={state} addCheckin={addCheckin} />}
+        {tab === 'learn' && <Learn />}
         {tab === 'more' && <More state={state} reset={reset} />}
       </main>
       {activeTool && <ToolModal toolId={activeTool} onClose={() => setActiveTool(null)} onAction={handleAction} favourite={state.favourites.includes(activeTool)} onFavourite={toggleFavourite} savedMeal={state.savedMealIds.includes(activeTool.replace('meal:', ''))} onToggleMeal={toggleMeal} />}
