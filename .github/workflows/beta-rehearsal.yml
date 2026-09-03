@@ -46,7 +46,7 @@ jobs:
           done
           test "${#ANCHOR_BETA_PASSWORD}" -ge 8 || { echo "::error::ANCHOR_BETA_PASSWORD must be at least 8 characters"; exit 1; }
 
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
 

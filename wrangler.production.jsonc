@@ -11,10 +11,20 @@
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": true,
   "preview_urls": false,
+  // run_worker_first is DELIBERATELY ABSENT. It used to be true here, and
+  // wrangler.beta.jsonc still carries a comment claiming production "keeps
+  // run_worker_first: true because there the app worker itself is main and
+  // serves assets correctly". That claim was never tested, and it is false.
+  // The first completed run of deploy.yml (Deploy Anchor #2, 2026-08-23)
+  // shipped with it on: /api/health returned a perfect 200 while EVERY
+  // /assets/* request returned 503, so no CSS and no JS loaded and the page
+  // sat forever on "Finding a gentle place to begin". With the flag off,
+  // Cloudflare serves files under dist/client directly and only non-asset
+  // paths reach the worker - which is what the gated rehearsal already
+  // proved works. Do not put it back.
   "assets": {
     "directory": "./dist/client",
-    "binding": "ASSETS",
-    "run_worker_first": true
+    "binding": "ASSETS"
   },
   "images": {
     "binding": "IMAGES"

@@ -63,7 +63,7 @@ jobs:
             test -n "${!name}" || { echo "::error::Missing required secret: $name"; exit 1; }
           done
 
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
           fetch-depth: 0
@@ -101,7 +101,6 @@ jobs:
         run: npm ci --ignore-scripts
 
       - name: Validate environment configuration
-        run: npm run validate:config -- --environment "${{ inputs.target_environment }}"
         # Run #1 failed here reporting NEXT_PUBLIC_SENTRY_DSN and SENTRY_DSN missing, while
         # "Enforce deploy boundary" above had just proved all four secrets were present. This
         # step had no env block, so validate-config.mjs read an empty environment and could
@@ -111,6 +110,7 @@ jobs:
           NEXT_PUBLIC_RELEASE_SHA: ${{ steps.record.outputs.target_commit }}
           NEXT_PUBLIC_SENTRY_DSN: ${{ secrets.NEXT_PUBLIC_SENTRY_DSN }}
           SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+        run: npm run validate:config -- --environment "${{ inputs.target_environment }}"
 
       - name: Validate, test and build the approved release
         env:
@@ -185,3 +185,13 @@ jobs:
             sleep 5
           done
           test "$healthy" = "true" || { echo "::error::Deployed health contract did not converge."; exit 1; }
+
+      - name: Verify the deployed page actually loads its assets
+        shell: bash
+        env:
+          DEPLOYMENT_URL: ${{ steps.deploy.outputs.deployment-url }}
+        # The logic lives in scripts/deployed-asset-check.mjs, not inline here, so that
+        # tests/deployed-asset-check.test.mjs can prove it FAILS on the exact deploy that
+        # shipped on 2026-08-23: page renders, /api/health perfect, every asset 503. A
+        # gate nobody has watched fail is a gate nobody should trust.
+        run: node scripts/deployed-asset-check.mjs
