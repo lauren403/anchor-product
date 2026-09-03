@@ -27,7 +27,7 @@
     "@fontsource/fraunces": "5.2.6",
     "@sentry/nextjs": "10.69.0",
     "drizzle-orm": "0.45.2",
-    "lucide-react": "0.536.0",
+    "lucide-react": "1.28.0",
     "next": "16.2.12",
     "react": "19.2.8",
     "react-dom": "19.2.8"
