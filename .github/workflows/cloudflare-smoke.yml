@@ -326,10 +326,19 @@ jobs:
           node -e 'require("node:fs").writeFileSync(process.argv[1], JSON.stringify({SENTRY_DSN:process.env.SENTRY_DSN,ANCHOR_SMOKE_TOKEN:process.env.ANCHOR_SMOKE_TOKEN}), {mode:0o600})' "$secrets_file"
 
           ./node_modules/.bin/wrangler versions list --name "$WORKER_NAME" --json > "$versions_before"
-          candidate_version="$(node -e 'const d=require("./"+process.argv[1]); const a=Array.isArray(d)?d:(d.items??d.versions??[]); if(!a[0]?.id)process.exit(1); process.stdout.write(a[0].id)' "$versions_before")"
+          # NOTE: `wrangler versions list --json` sorts ascending by created_on and
+          # returns only the most recent VERSION_LIST_LIMIT entries, so the newest
+          # version is the LAST array element, not a[0] - picking a[0] silently grabbed
+          # a stale version from a prior run (observed: runs #33-#36 all rolled back to
+          # an days-old version, tripping Cloudflare's "secret has changed" guard,
+          # error 10220). Match on this run's own deploy tag instead of array position
+          # so selection is correct regardless of list ordering or truncation.
+          candidate_tag="candidate-${{ github.run_id }}"
+          candidate_version="$(node -e 'const d=require("./"+process.argv[1]); const a=Array.isArray(d)?d:(d.items??d.versions??[]); const tag=process.argv[2]; const match=a.find((v)=>v.annotations?.["workers/tag"]===tag); if(!match?.id){console.error("no version found with tag "+tag); process.exit(1);} process.stdout.write(match.id)' "$versions_before" "$candidate_tag")"
           ./node_modules/.bin/wrangler versions upload --config wrangler.smoke.jsonc --tag rollback-drill-${{ github.run_id }} --message "Rollback drill intermediate" --var "ROLLBACK_DRILL_MARKER:${{ github.run_id }}" --secrets-file "$secrets_file"
           ./node_modules/.bin/wrangler versions list --name "$WORKER_NAME" --json > "$versions_after"
-          drill_version="$(node -e 'const d=require("./"+process.argv[1]); const a=Array.isArray(d)?d:(d.items??d.versions??[]); if(!a[0]?.id)process.exit(1); process.stdout.write(a[0].id)' "$versions_after")"
+          drill_tag="rollback-drill-${{ github.run_id }}"
+          drill_version="$(node -e 'const d=require("./"+process.argv[1]); const a=Array.isArray(d)?d:(d.items??d.versions??[]); const tag=process.argv[2]; const match=a.find((v)=>v.annotations?.["workers/tag"]===tag); if(!match?.id){console.error("no version found with tag "+tag); process.exit(1);} process.stdout.write(match.id)' "$versions_after" "$drill_tag")"
           test "$drill_version" != "$candidate_version"
           ./node_modules/.bin/wrangler versions deploy "$drill_version@100%" --name "$WORKER_NAME" --message "Anchor rollback drill intermediate" --yes
           curl --fail --silent --show-error --max-time 20 --header "Authorization: Bearer $ACCESS_TOKEN" "${DEPLOYMENT_URL%/}/api/health" > /dev/null
