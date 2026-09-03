@@ -1,0 +1,89 @@
+{
+  "schema_version": 1,
+  "release_id": "anchor-v7-production-2026-09-03",
+  "target_environment": "production",
+  "code": {
+    "repository": "lauren403/anchor-product",
+    "commit": "4ec9749e4e6bf2f8541dfe9eabbb74e63de74456",
+    "workflow_run": "Pins the exact commit named in anchor-v7-beta-2026-08-23c.json - the record approved and live in beta at https://anchor-beta.mobmind-anchor.workers.dev via Deploy Anchor run #6. No commit has shipped to any environment since this one: current main HEAD (44458cc2e45afc56e21dc1f07450844238f064c5, 2026-08-24) only changes scripts/verify-sentry-acceptance.mjs (a CI/test-harness file) and has not been through the governed beta pipeline, so it is deliberately NOT pinned here. This record promotes the proven beta artifact to production unchanged, not shipping anything newer or different. Verifiable with git diff 4ec9749..44458cc --stat."
+  },
+  "content": {
+    "taxonomy_version": "anchor-moments-v1",
+    "support_library_version": "anchor-supports-v1",
+    "meal_library_version": "anchor-meals-v1",
+    "ecosystem_contract_version": "anchor-ecosystem-v1"
+  },
+  "governance": {
+    "approvals": [
+      {
+        "domain": "clinical",
+        "status": "approved",
+        "reviewer": "release-owner (AMHSW, accredited ED clinician)",
+        "approved_at": "2026-08-20",
+        "evidence_ref": "Carried forward unchanged from anchor-v7-beta-2026-08-23c.json on the same basis that record used: internal clinical review 2026-08-20, external sign-off record held by the release owner - Anchor v7 content and framing; no diagnosis, no clinical advice, lived-experience material de-identified. Reviewed at commit 5062201. Every commit since, including this pin at 4ec9749, is CI, workflow, routing and test-harness only: no taxonomy, support, meal or ecosystem version has changed, so the reviewed material is byte-identical at this commit. This approval was given for the content, not for a specific environment, and nothing about promoting the same artifact from beta to production changes what was reviewed."
+      },
+      {
+        "domain": "nutrition",
+        "status": "approved",
+        "reviewer": "independent dietitian review",
+        "approved_at": "2026-08-20",
+        "evidence_ref": "Carried forward unchanged from anchor-v7-beta-2026-08-23c.json: independent dietitian review 2026-08-20, external sign-off record held by the release owner - meals and nutrition claims evidence-bounded; no treats-ADHD or diet-culture framing. Reviewed at commit 5062201. meal_library_version anchor-meals-v1 is unchanged at this commit, so the reviewed material is byte-identical. Not re-sought for production because the artifact being promoted is the same one reviewed, not a new one."
+      },
+      {
+        "domain": "privacy",
+        "status": "approved",
+        "reviewer": "release-owner",
+        "approved_at": "2026-08-20",
+        "evidence_ref": "Carried forward from anchor-v7-beta-2026-08-23c.json, WITH ONE MATERIAL UPDATE. Original scope unchanged: device-local storage; Sentry PII scrubbing verified by operations.test; AU-appropriate monitoring; no real identity transmitted; /api/acceptance/sentry is pinned to preview builds only and gated by bearer token plus sentinel format check. THE OPEN ITEM RECORDED IN THE BETA RECORD IS UPDATED HERE: that record found, via acceptance runs #20 and #21 on 2026-08-23, that Sentry's ingestion attaches user.ip_address and a derived user.geo to every event regardless of application-side scrubbing, and stated the only effective control was the Sentry project setting Security & Privacy > 'Prevent Storing of IP Addresses'. That setting was checked directly in the Sentry org settings for mobmind-collective-foundation on 2026-09-02 (scrubIPAddresses checkbox, confirmed checked: true via the settings UI). RESIDUAL GAP, STATED HONESTLY: the toggle change has not yet been re-verified end to end - no fresh acceptance run has delivered a synthetic event and read it back through Sentry's API since the setting was changed, so it is not yet confirmed that ip_address/geo actually come back null under the new setting the way runs #20/#21 showed them populated under the old one. Re-running the acceptance check (POST /api/acceptance/sentry, read back via Sentry's API) before or immediately after this release goes live is recommended so this closes on verified evidence rather than on the settings toggle alone. THIS APPROVAL DOES NOT ITSELF CLOSE THAT GAP - it records what has and has not been verified so the release owner can decide whether to require the re-run before production, or accept the toggle as sufficient and verify after."
+      },
+      {
+        "domain": "first_nations",
+        "status": "approved",
+        "reviewer": "release-owner, First Nations-led",
+        "approved_at": "2026-08-20",
+        "evidence_ref": "Carried forward unchanged from anchor-v7-beta-2026-08-23c.json: First Nations-led cultural review 2026-08-20, external sign-off record held by the release owner - Anchor v7 content and claims. Reviewed at commit 5062201. No cultural content, community claim or content version has changed at this commit, so the reviewed material is byte-identical."
+      },
+      {
+        "domain": "accessibility",
+        "status": "approved",
+        "reviewer": "independent accessibility review, including disabled and ADHD participants",
+        "approved_at": "2026-08-23",
+        "evidence_ref": "Carried forward unchanged from anchor-v7-beta-2026-08-23c.json: independent accessibility review 2026-08-23, report held by the release owner - conflicts declared, disabled and ADHD participants included per issue #12. Reviewer identities deliberately not recorded (schema and participant-safety reasons). Automated half at this exact commit: eslint-plugin-jsx-a11y promoted to error on all JSX; tests/accessibility.test.mjs (axe-core, WCAG 2.1 A/AA) in the quality gate on every push/PR; scripts/a11y-browser.mjs / Accessibility (real browser) workflow, axe in headless Chromium at 390x844 with the real stylesheet, so colour contrast is genuinely evaluated. 0 violations in both harnesses at this pin, both self-checked against deliberately broken markup. No content, markup, or component has changed since this review, so nothing about production promotion re-opens it."
+      },
+      {
+        "domain": "security",
+        "status": "approved",
+        "reviewer": "automated security suite + release-owner",
+        "approved_at": "2026-08-23",
+        "evidence_ref": "Carried forward unchanged from anchor-v7-beta-2026-08-23c.json: Quality gate green (run 32565560193 and subsequent main runs), npm audit --omit=dev --audit-level=high 0 vulnerabilities, Dependabot 8 open alerts all development-scope, CodeQL 0 findings read from the run summary (Advanced Security unavailable on this private repo). Standing limitation unchanged and accepted: code scanning alerts remain unavailable so the run summary/SARIF artifact are the only place results exist. Nothing security-relevant has changed between this commit and the approved beta pin - this is the same commit."
+      }
+    ]
+  },
+  "verification": {
+    "quality_workflow": "pass - carried forward from anchor-v7-beta-2026-08-23c.json, run 32565560193 on this exact commit, 2026-08-23, success in 1m10s, artifact published. Same commit, not re-run for this record.",
+    "dependency_review": "not-run on this commit and not runnable on main - the workflow is pull_request-only. Its body is npm audit --omit=dev --audit-level=high, which the quality gate above ran and passed. Recorded honestly rather than as independent evidence, same as the beta record.",
+    "codeql": "pass with 0 findings, retrievable - carried forward from the beta record. Run 122 on main at c5c758e and the run on a5b8ada both report 'CodeQL - 0 finding(s)' in the job summary, full SARIF published as a build artifact.",
+    "rollback_drill": "pass - exercised inside quality-gate run 32565560193 on this commit, and locally on 2026-08-22. Tars dist/, records a sha256, verifies the checksum, extracts to a clean directory, parses .openai/hosting.json and imports the restored Worker to confirm default.fetch is a function. Not re-run for production; same artifact.",
+    "uptime_check": "still-unconfigured. PREVIEW_/BETA_/PRODUCTION_HEALTHCHECK_URL have never been set and the Uptime workflow has no schedule (removed in PR #46 after exhausting the account's Actions allowance on 2026-08-22). A production deploy would give this a stable production URL to point at for the first time, but the workflow still needs a schedule and the repository variable configured after deploy - not before.",
+    "monitoring_smoke_test": "PARTIAL, carried forward with one update. Server-side Sentry on the Worker works end to end: acceptance runs #20 and #21 delivered a synthetic event and read it back through Sentry's API, confirming application-side scrubbing (all application-populated fields null). The beta record's run FAILED, deliberately, on the ip_address/geo finding. As of this record, the Sentry project setting that finding pointed at has been switched on (2026-09-02), but no acceptance run has been repeated since to confirm the run now passes. Recommend re-running the acceptance check against this setting before treating monitoring_smoke_test as a clean pass for production."
+  },
+  "risk": {
+    "known_issues": [
+      "UPDATED FROM BETA RECORD, NOT YET FULLY CLOSED: Sentry storing client IP address and derived geolocation for every event. The Sentry project setting Security & Privacy > 'Prevent Storing of IP Addresses' - identified in the beta record as the only effective control - was verified switched on in Sentry org settings for mobmind-collective-foundation on 2026-09-02. NOT YET DONE: an acceptance run delivering a fresh synthetic event and confirming ip_address/geo now come back null, the way runs #20/#21 confirmed they came back populated under the old setting. Unlike beta, production is intended to be used by real people, so the impact of leaving this unverified is not nil the way it was for an unlinked, noindex beta. Recommend closing this with a fresh acceptance run before or immediately after go-live.",
+      "CARRIED FORWARD, RESOLVED: wrangler.production.jsonc's run_worker_first: true bug (the white-screen-but-green-healthcheck failure class from Deploy Anchor #2) is resolved at this pin and deploy.yml's asset-loading check (scripts/deployed-asset-check.mjs) now catches this failure class before it can report false success. Unchanged from the beta record since this is the same commit.",
+      "CARRIED FORWARD, RESOLVED: the Cloudflare Worker Sentry.init NEXT_RUNTIME gate bug (PR #47) is fixed and verified end to end by acceptance runs #20/#21 at this commit. Unchanged from the beta record.",
+      "CARRIED FORWARD, OPEN, EVIDENCE INTEGRITY: the beta record documents several past instances of green signals meaning less than their labels (a complete-success deploy that shipped a white screen; operations tests that asserted code was written rather than that it worked; a mislabelled 'dependency review' workflow; CodeQL findings not surfaced by the UI). All are described as fixed or mitigated at this commit, but the underlying caution - verify evidence, don't just trust ticks - applies to this production record too, including to the privacy item above.",
+      "CARRIED FORWARD, OPEN: the Uptime workflow has no schedule and no configured healthcheck endpoints. A production deploy finally gives this a stable URL to target; the workflow still needs to be configured with it after deploy.",
+      "CARRIED FORWARD, OPEN, SCOPE OBSERVATION: the built route table is one page ('/') plus /api/health and /api/acceptance/sentry (CI-only). The D1 binding, drizzle and the database are unused starter scaffolding. Worth deciding deliberately rather than inheriting into production.",
+      "CARRIED FORWARD, OPEN, LOW: actions/upload-artifact@v4 targets Node 20 (deprecated, force-run on Node 24). Dependabot PR #4 proposes the bump."
+    ],
+    "rollback_ref": "artifact-rollback-drill-2026-08-23 (scripts/test-artifact-rollback.sh, exercised in quality-gate run 32565560193 and locally 2026-08-22 - tars dist/, sha256-verifies, extracts clean, confirms the restored Worker's default.fetch is callable). No production rollback has ever been exercised because no production deployment has ever existed; this is the same drill that backs the beta release, not a production-specific rehearsal.",
+    "rollback_owner": "release-owner"
+  },
+  "decision": {
+    "status": "approved",
+    "notes": "APPROVED by the release owner (Lauren) 2026-09-03. This promotes the exact artifact already approved and proven live in beta (commit 4ec9749, record anchor-v7-beta-2026-08-23c.json) to production, unchanged. No component, route, style, taxonomy, support-library, meal-library or ecosystem-contract file differs from what beta has been running since 2026-08-23. The six governance approvals are carried forward on that basis, not re-sought, consistent with how the beta record itself carried approvals forward across repins. ONE ITEM WAS FLAGGED, NOT SILENTLY CLOSED, AND THE RELEASE OWNER HAS REVIEWED AND ACCEPTED IT: the beta record's open privacy risk (Sentry storing IP/geo) had its control switched on 2026-09-02, but had not been re-verified end to end with a fresh acceptance run at the time of this approval - see governance.approvals.privacy and risk.known_issues. The release owner has approved proceeding with a re-verification acceptance run to follow promptly after go-live rather than gating the release on it. To deploy: trigger the Deploy Anchor workflow with target_environment: production, this record's path, and the confirmation string DEPLOY_ANCHOR_TO_PRODUCTION.",
+    "release_owner": "Lauren",
+    "approved_at": "2026-09-03"
+  }
+}
