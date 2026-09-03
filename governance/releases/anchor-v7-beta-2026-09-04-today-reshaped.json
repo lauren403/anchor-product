@@ -1,0 +1,88 @@
+{
+  "schema_version": 1,
+  "release_id": "anchor-v7-beta-2026-09-04-today-reshaped",
+  "target_environment": "beta",
+  "code": {
+    "repository": "lauren403/anchor-product",
+    "commit": "27538443f5efd18fd635dd0c01e72f13a7916e93",
+    "workflow_run": "PR #56, squash-merged to main same day. First functional (non-CI-only) change since the 2026-09-03 production record: adds a check-in-aware reordering of Today's 'meet the day where it is' grid, a barrier filter (decision-load / sensory-load / activation / shame / time-blindness / words) in Explore alongside the existing pillar filter, a 1-3 effort-dot cue on every lived-moment card, an inline 'Cited' badge on cards that have a genuine entry in the existing evidence register (linking straight to it in More), a device-local low-stimulation mode toggle (mutes colour, disables motion app-wide), and a six-pillar strip in My plan extending the existing eating-rhythm pattern to Begin/Regulate/Connect/Move/Understand. Implementation: components/anchor/content.js gained `barriers`, `effort` and `evidenceId` fields on all 18 existing rightNowPaths entries (no id, title, subtitle, pillar or duration changed on any entry); components/anchor/store.ts gained `settings.lowStimulation`; components/anchor/LegacyAnchorApp.jsx and app/globals.css carry the UI. No meal, fuel, connection-card or program content changed. No new network calls, no new data collected — the check-in-aware reordering reads check-ins already stored device-local by the existing Check-in feature; nothing new leaves the device.",
+    "diff_summary": "4 files changed, 231 insertions(+), 43 deletions(-): app/globals.css, components/anchor/LegacyAnchorApp.jsx, components/anchor/content.js, components/anchor/store.ts. Full diff: https://github.com/lauren403/anchor-product/pull/56/files"
+  },
+  "content": {
+    "taxonomy_version": "anchor-moments-v1",
+    "support_library_version": "anchor-supports-v1",
+    "meal_library_version": "anchor-meals-v1",
+    "ecosystem_contract_version": "anchor-ecosystem-v1"
+  },
+  "governance": {
+    "approvals": [
+      {
+        "domain": "clinical",
+        "status": "pending",
+        "reviewer": null,
+        "approved_at": null,
+        "evidence_ref": "NOT YET SOUGHT. What needs review: Today now reorders its content grid based on the person's most recent Check-in answers (e.g. a 'foggy' or 'not eaten yet' check-in brings Nourish/Regulate moments to the front, stated to the person in plain language: 'Since your last check-in mentioned...'). This is the first feature where self-reported check-in content visibly drives what the app shows elsewhere, rather than staying inside the Check-in screen. It is deterministic and rule-based (a small fixed table in LegacyAnchorApp.jsx, CHECKIN_FOCUS_RULES — not inferred or generated), nothing is hidden or removed, and it makes no diagnostic or clinical claim, but the release owner (AMHSW, accredited ED clinician) should confirm this framing does not read as clinical inference before it reaches users."
+      },
+      {
+        "domain": "nutrition",
+        "status": "pending",
+        "reviewer": null,
+        "approved_at": null,
+        "evidence_ref": "NOT YET SOUGHT, LOW RISK. No meal, fuel or nutrition-claim content changed. Two Nourish-pillar cards ('I forgot to eat', 'Nothing sounds manageable') and two others now carry a 'Cited' badge linking to the already-approved aadpa-lifestyle evidence-register entry — surfacing existing, already-reviewed evidence more prominently, not adding a new claim. Reviewer should confirm the badge itself doesn't overstate the strength of that evidence by its placement."
+      },
+      {
+        "domain": "privacy",
+        "status": "pending",
+        "reviewer": null,
+        "approved_at": null,
+        "evidence_ref": "NOT YET SOUGHT. No new data is collected and nothing new leaves the device — the check-in-aware reordering only reads check-ins already stored in this release's existing device-local storage. Worth explicit release-owner sign-off anyway, since it is the first feature that reads stored check-in content back into a different part of the UI, and privacy review has previously caught things (IP/geo in Sentry events) that were correct in design intent but needed verifying in practice."
+      },
+      {
+        "domain": "first_nations",
+        "status": "pending",
+        "reviewer": null,
+        "approved_at": null,
+        "evidence_ref": "NOT YET SOUGHT. No content in the Understand pillar, or any First Nations-related material, was touched by this change. Left pending rather than marked approved because no reviewer has actually looked at it for this commit — the schema requires an explicit record per release, not an inferred waiver."
+      },
+      {
+        "domain": "accessibility",
+        "status": "pending",
+        "reviewer": null,
+        "approved_at": null,
+        "evidence_ref": "AUTOMATED EVIDENCE ONLY, HUMAN REVIEW NOT YET SOUGHT. eslint-plugin-jsx-a11y (promoted to error) and tests/accessibility.test.mjs (axe-core, WCAG 2.1 A/AA) both passed with 0 violations against the new markup in PR #56's quality-gate run (https://github.com/lauren403/anchor-product/actions/runs/33817280111) — including the new effort-dot cue (role=img with an aria-label stating the level), the evidence badge (a labelled button, not a bare icon), the barrier filter chips, and the low-stimulation switch (role=switch, aria-checked, aria-labelledby, restructured off a <label> after an initial jsx-a11y/label-has-associated-control failure caught it pre-merge). This is real, current automated evidence, not a rerun of the last human review — the prior independent review with disabled and ADHD participants (2026-08-23) predates this change and does not cover it."
+      },
+      {
+        "domain": "security",
+        "status": "pending",
+        "reviewer": null,
+        "approved_at": null,
+        "evidence_ref": "AUTOMATED EVIDENCE ONLY. Quality gate green on both the PR head and the merge commit (lint, typecheck, unit tests, build, rendered/accessibility tests, npm audit --omit=dev --audit-level=high: 0 vulnerabilities, rollback drill) — https://github.com/lauren403/anchor-product/actions/runs/33817280111. Two CI-only anomalies observed and investigated, neither a security finding: (1) the PR's separate 'Dependency review' workflow (the same npm audit command, run minutes after quality gate, deliberately duplicated per that workflow's own file comment) failed once at run https://github.com/lauren403/anchor-product/actions/runs/33817280369 — re-run locally against the exact same lockfile immediately after: 0 vulnerabilities, consistent with the documented pattern in anchor-v7-production-2026-09-03.json where a transient GitHub Advisory Database entry appeared and cleared within minutes, not a real code issue. (2) CodeQL's actual analysis step passed on the merge commit; only its SARIF/database artifact-upload step failed, with '403 Forbidden' / 'Resource not accessible by integration' — the same private-repo-on-a-personal-account Advanced Security limitation dependency-review.yml's own file comment already documents, not a new finding. No open Dependabot alert or CodeQL finding is known against this commit."
+      }
+    ]
+  },
+  "verification": {
+    "quality_workflow": "PASS. PR #56 quality-gate run https://github.com/lauren403/anchor-product/actions/runs/33817280111 (PR head 928db7f): lint, typecheck, 20 unit tests, build, rendered/accessibility test suite, npm audit (0 vulnerabilities), rollback drill — all green. Quality-gate also ran again automatically on the merge commit itself (27538443, push to main) with the same result.",
+    "dependency_review": "MIXED, RESOLVED. Failed once on the PR head (see security approval evidence_ref for the full account) on what re-verification immediately showed was a transient advisory, not a real vulnerability in this commit's dependency tree. Re-checked independently after merge: `npm ci --ignore-scripts && npm audit --omit=dev --audit-level=high` against main's current lockfile reports 0 vulnerabilities.",
+    "codeql": "Analysis step passed with a working SARIF (0 findings reported by the 'Summarise CodeQL findings' step) on both the PR head and the merge commit. Artifact publication failed on both due to a pre-existing repo permission limitation, not a scan finding — see security approval evidence_ref.",
+    "rollback_drill": "PASS — exercised inside the PR #56 quality-gate run (https://github.com/lauren403/anchor-product/actions/runs/33817280111, step 'Run npm run test:rollback'). Not separately re-run for this record; same drill, same artifact shape as prior records.",
+    "uptime_check": "Unchanged from prior records: still unconfigured (no healthcheck URLs set, no schedule on the Uptime workflow).",
+    "monitoring_smoke_test": "Not re-run for this change. This release touches no Sentry, monitoring or ecosystem-navigation code — carried forward from the 2026-09-03 production record's closed verification on that basis, not independently re-verified here.",
+    "release_readiness": "Not yet run for this record. Should be dispatched against this record's path once target_environment and approvals are finalised, per the existing release-readiness.yml workflow."
+  },
+  "risk": {
+    "known_issues": [
+      "OPEN, THE REASON THIS RECORD IS A DRAFT: no human clinical, nutrition, privacy, First Nations or accessibility reviewer has looked at this specific change yet. All six governance approvals above are 'pending' with a description of exactly what each reviewer needs to check. This record will correctly fail `validate:release --require-approved` (and therefore the Deploy Anchor workflow) until the release owner reviews and updates it.",
+      "OBSERVED AND RESOLVED DURING VERIFICATION: the PR's 'Dependency review' check failed once on a transient GitHub Advisory Database entry that cleared within minutes — see the security approval evidence_ref for the full account and the immediate independent re-check that found 0 vulnerabilities.",
+      "OBSERVED, NOT A FINDING: CodeQL's SARIF artifact-upload step fails on this repo (private, personal-account, no Advanced Security) — the analysis itself completes and reports 0 findings; only the downloadable-artifact step is blocked by a permissions limitation that predates this change (documented in dependency-review.yml's own file comment).",
+      "CARRIED FORWARD, OPEN: the Uptime workflow still has no schedule and no configured healthcheck endpoints (unchanged from the 2026-09-03 production record)."
+    ],
+    "rollback_ref": "PR #56 quality-gate run https://github.com/lauren403/anchor-product/actions/runs/33817280111, step 'Run npm run test:rollback' — tars dist/, sha256-verifies, extracts clean, confirms the restored Worker's default.fetch is callable. Same drill used by every prior record; not independently re-exercised for this one.",
+    "rollback_owner": "release-owner"
+  },
+  "decision": {
+    "status": "draft",
+    "notes": "DRAFT — not approved. This record documents a real, merged, technically-verified change (PR #56, now on main at 27538443) so the release owner has everything needed to review it, but it deliberately does NOT claim clinical, nutrition, privacy, First Nations or accessibility sign-off that has not actually happened. All six governance approvals above are explicitly 'pending' with a description of exactly what each domain's reviewer should check. `npm run validate:release -- governance/releases/anchor-v7-beta-2026-09-04-today-reshaped.json --require-approved` will correctly fail against this record as written, which is by design: the Deploy Anchor workflow should not run against this commit until the release owner has actually reviewed it and edited this record's approvals and decision.status to reflect that review — not before.",
+    "release_owner": null,
+    "approved_at": null
+  }
+}
