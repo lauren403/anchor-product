@@ -30,7 +30,7 @@ export interface AnchorProductState {
   checkins: CheckIn[];
   programHistory: Array<{ programId: string; completedAt: string }>;
   oneThing: string;
-  settings: { remindersOn: boolean };
+  settings: { remindersOn: boolean; lowStimulation: boolean };
   migratedAt: string | null;
 }
 
@@ -62,7 +62,7 @@ const freshState = (): AnchorProductState => ({
   checkins: [],
   programHistory: [],
   oneThing: "",
-  settings: { remindersOn: false },
+  settings: { remindersOn: false, lowStimulation: false },
   migratedAt: null,
 });
 
@@ -164,7 +164,7 @@ function normalise(raw: unknown): AnchorProductState {
     checkins: mergeLegacyCheckins(source),
     programHistory: Array.isArray(source.programHistory) ? source.programHistory.filter((item): item is { programId: string; completedAt: string } => Boolean(item && typeof item === "object" && typeof (item as { programId?: unknown }).programId === "string")).slice(-100) : [],
     oneThing: typeof source.oneThing === "string" ? source.oneThing.slice(0, 120) : "",
-    settings: { remindersOn: Boolean(settings.remindersOn) },
+    settings: { remindersOn: Boolean(settings.remindersOn), lowStimulation: Boolean(settings.lowStimulation) },
     migratedAt: typeof source.migratedAt === "string" ? source.migratedAt : new Date().toISOString(),
   };
 }
@@ -206,6 +206,7 @@ export function useAnchorStore() {
     setState((previous) => ({ ...previous, [key]: previous[key].includes(id) ? previous[key].filter((item) => item !== id) : [...previous[key], id] }));
   }, []);
   const addCheckin = useCallback((checkin: CheckIn) => setState((previous) => ({ ...previous, checkins: [...previous.checkins, { ...checkin, id: localId(), createdAt: new Date().toISOString() }].slice(-100) })), []);
+  const toggleLowStimulation = useCallback(() => setState((previous) => ({ ...previous, settings: { ...previous.settings, lowStimulation: !previous.settings.lowStimulation } })), []);
   const completeProgram = useCallback((programId: string) => setState((previous) => ({ ...previous, programHistory: [...previous.programHistory, { programId, completedAt: new Date().toISOString() }].slice(-100) })), []);
   const reset = useCallback(() => {
     try {
@@ -224,8 +225,9 @@ export function useAnchorStore() {
     toggleMeal: (id: string) => toggleList("savedMealIds", id),
     addCheckin,
     completeProgram,
+    toggleLowStimulation,
     reset,
-  }), [state, hydrated, update, toggleList, addCheckin, completeProgram, reset]);
+  }), [state, hydrated, update, toggleList, addCheckin, completeProgram, toggleLowStimulation, reset]);
 }
 
 export function getNextMoment(rhythm: RhythmMoment[], now = new Date()) {

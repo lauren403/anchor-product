@@ -461,6 +461,63 @@ button:disabled { opacity: .45; cursor: not-allowed; }
   .finder-actions .button { width: 100%; }
 }
 
+/* --- Check-in-aware Today, barrier filtering, effort cues, inline evidence, ---------- */
+/* --- low-stimulation mode, and the six-pillar plan strip. --------------------------- */
+
+.stim-switch { margin-top: 1.1rem; padding: .85rem 1rem; border: 1px solid var(--line); border-radius: 16px; background: var(--paper); display: flex; align-items: center; justify-content: space-between; gap: 1rem; max-width: 420px; }
+.stim-switch span { display: flex; flex-direction: column; gap: .15rem; }
+.stim-switch small { color: var(--muted); font-weight: 400; }
+.switch-track { flex: 0 0 auto; width: 46px; height: 26px; padding: 3px; border: 0; border-radius: 999px; background: var(--line); cursor: pointer; display: flex; align-items: center; transition: background .18s ease; }
+.switch-track.on { background: var(--clay); }
+.switch-knob { width: 20px; height: 20px; border-radius: 50%; background: var(--paper); box-shadow: 0 1px 3px rgba(46, 26, 34, .35); transition: transform .18s ease; }
+.switch-track.on .switch-knob { transform: translateX(20px); }
+
+.responsive-note { display: flex; align-items: flex-start; gap: .7rem; max-width: 640px; padding: 1rem 1.15rem; border: 1px solid var(--olive); border-left-width: 4px; border-radius: 16px; background: var(--olive-pale); color: #2f3f25; }
+.responsive-note svg { flex: 0 0 auto; margin-top: .15rem; }
+.responsive-note p { margin: 0; }
+.text-button.inline { display: inline; min-height: 0; padding: 0; text-decoration: underline; }
+
+.path-card-top-actions { display: flex; align-items: center; gap: .6rem; }
+.effort-dots { display: inline-flex; gap: 3px; align-items: center; }
+.effort-dots i { display: block; width: 6px; height: 6px; border-radius: 50%; background: currentColor; opacity: .28; }
+.effort-dots i.on { opacity: .85; }
+.right-now-button .effort-dots { color: var(--plum); margin-left: -.2rem; }
+
+.evidence-badge { margin-top: .7rem; align-self: flex-start; min-height: 0; display: inline-flex; align-items: center; gap: .3rem; padding: .3rem .6rem; border: 1px solid var(--line); border-radius: 999px; background: rgba(255, 250, 244, .8); color: var(--plum); font-size: .68rem; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; cursor: pointer; }
+.evidence-badge:hover { background: var(--paper); }
+
+.barrier-row { margin: -.3rem 0 1.4rem; display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
+.barrier-row-label { font-size: .8rem; font-weight: 700; color: var(--muted); margin-right: .2rem; }
+.chip-barrier { min-height: 38px; padding: .4rem .8rem; border: 1px dashed var(--line); border-radius: 999px; background: transparent; color: var(--muted); font-size: .78rem; font-weight: 600; cursor: pointer; }
+.chip-barrier.active { border-style: solid; background: var(--plum); border-color: var(--plum); color: var(--paper); }
+
+.pillar-strip { display: grid; grid-template-columns: repeat(3, 1fr); gap: .6rem; margin-top: 1rem; }
+.pillar-strip-item { padding: .8rem .6rem; border: 1px solid var(--line); border-radius: 14px; background: var(--paper); display: flex; flex-direction: column; gap: .3rem; align-items: center; text-align: center; cursor: pointer; font-size: .8rem; }
+.pillar-strip-item span { color: var(--muted); font-size: .72rem; }
+.pillar-strip-item[data-filled='true'][data-tone='clay'] { background: var(--clay-pale); }
+.pillar-strip-item[data-filled='true'][data-tone='rose'] { background: var(--rose-pale); }
+.pillar-strip-item[data-filled='true'][data-tone='gold'] { background: var(--gold-pale); }
+.pillar-strip-item[data-filled='true'][data-tone='olive'] { background: var(--olive-pale); }
+.pillar-strip-item[data-filled='true'][data-tone='blue'] { background: var(--blue-pale); }
+.pillar-strip-item[data-filled='true'][data-tone='plum'] { background: #eadde2; }
+
+.evidence-list article.highlighted { outline: 3px solid var(--clay); outline-offset: 2px; background: var(--gold-pale); }
+
+/* Low-stimulation mode: same content, no motion, muted colour. Toggled from Today; the */
+/* class lives on .app-shell so it reaches every screen, not just the one it was set on. */
+.low-stim, .low-stim * { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; scroll-behavior: auto !important; }
+.low-stim [data-tone] { filter: grayscale(.45) saturate(.7); }
+.low-stim .right-now-button:hover, .low-stim .campaign-card:hover, .low-stim .meal-image-button img:hover { transform: none; box-shadow: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .switch-track, .switch-knob, .right-now-button, .campaign-card, .meal-image-button img { transition-duration: .001ms !important; }
+}
+
+@media (max-width: 620px) {
+  .pillar-strip { grid-template-columns: repeat(2, 1fr); }
+  .stim-switch { max-width: none; }
+}
+
 @media print {
   .topbar, .bottom-nav, .button, button { display: none !important; }
   .content-shell { width: 100%; padding: 0; }
