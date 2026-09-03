@@ -26,6 +26,7 @@ jobs:
       NEXT_PUBLIC_ANCHOR_ENV: ${{ inputs.target_environment }}
       NEXT_PUBLIC_RELEASE_SHA: ${{ github.sha }}
       NEXT_PUBLIC_SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+      SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
