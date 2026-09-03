@@ -7,25 +7,30 @@ export const pillars = [
   { id: 'understand', label: 'Understand', short: 'The science, honestly', tone: 'blue' },
 ]
 
+// `barriers` names what is actually in the way (used by Explore's barrier filter and by
+// Today's check-in-aware sorting); `effort` is a 1-3 scale derived from `duration` so cards
+// can carry a quick visual weight cue; `evidenceId` links to the matching entry in
+// `evidenceNotes` below, when one genuinely supports this card's content — not every card
+// gets one, because not every card has a citable source behind it.
 export const rightNowPaths = [
-  { id: 'unsent-conversation', pillar: 'connect', title: 'I keep rehearsing what I need to say', subtitle: 'The perfect moment has not come. Let’s make a bridge to the real one.', duration: '4 min', icon: 'MessageCircleMore' },
-  { id: 'forgot-eat', pillar: 'nourish', title: 'I forgot to eat', subtitle: 'Start where you are. No making up for it.', duration: '2 min', icon: 'Utensils' },
-  { id: 'cant-start', pillar: 'begin', title: 'I know what to do. I still can’t begin.', subtitle: 'Knowing and starting are different jobs.', duration: '5 min', icon: 'Play' },
-  { id: 'too-many-tabs', pillar: 'regulate', title: 'My brain has too many tabs open', subtitle: 'Stop solving. Reduce the number of things asking for you.', duration: '3 min', icon: 'Layers3' },
-  { id: 'nothing-manageable', pillar: 'nourish', title: 'Nothing sounds manageable', subtitle: 'Lower the sensory and decision load.', duration: '3 min', icon: 'Soup' },
-  { id: 'small-mistake', pillar: 'connect', title: 'A small mistake feels enormous', subtitle: 'Separate the moment from the story your body attached to it.', duration: '4 min', icon: 'HeartHandshake' },
-  { id: 'lost-the-day', pillar: 'begin', title: 'I started one thing and lost the whole day', subtitle: 'Hyperfocus needs a landing—not a punishment.', duration: '4 min', icon: 'TimerReset' },
-  { id: 'out-of-sight', pillar: 'begin', title: 'If I can’t see it, it leaves my brain', subtitle: 'Make the next cue visible without turning the room into a reminder wall.', duration: '3 min', icon: 'Eye' },
-  { id: 'overwhelmed', pillar: 'regulate', title: 'Everything feels too loud', subtitle: 'Less input. One point of contact.', duration: '3 min', icon: 'Waves' },
-  { id: 'med-appetite', pillar: 'nourish', title: 'My medication changed my appetite', subtitle: 'A gentle rhythm and the right clinical support.', duration: '4 min', icon: 'Clock3' },
-  { id: 'waiting-urgency', pillar: 'begin', title: 'I’m waiting for the pressure to arrive', subtitle: 'Borrow activation before panic has to provide it.', duration: '5 min', icon: 'Gauge' },
-  { id: 'systems-collapse', pillar: 'begin', title: 'I have a system for every system', subtitle: 'When the support structure becomes another task.', duration: '4 min', icon: 'ListChecks' },
-  { id: 'look-capable', pillar: 'regulate', title: 'I’m exhausted from looking capable', subtitle: 'High functioning can still cost too much.', duration: '5 min', icon: 'BatteryLow' },
-  { id: 'reply-late', pillar: 'connect', title: 'I left it too long to reply', subtitle: 'The shame grows while the message gets no easier.', duration: '3 min', icon: 'MessageSquareReply' },
-  { id: 'sensory-anchor', pillar: 'regulate', title: 'My body needs something steady to hold', subtitle: 'Try a quiet tactile anchor without claiming it will fix the feeling.', duration: '3 min', icon: 'Hand' },
-  { id: 'move-reset', pillar: 'move', title: 'I need to move or change the channel', subtitle: 'No goals, pace or calories attached.', duration: '4 min', icon: 'Footprints' },
-  { id: 'wind-down', pillar: 'regulate', title: 'My brain won’t clock off', subtitle: 'Build a softer off-ramp for unfinished loops.', duration: '5 min', icon: 'Moon' },
-  { id: 'research', pillar: 'understand', title: 'I want the research without the wellness hype', subtitle: 'What we know, what is preliminary, and who to ask.', duration: '6 min', icon: 'BookOpen' },
+  { id: 'unsent-conversation', pillar: 'connect', title: 'I keep rehearsing what I need to say', subtitle: 'The perfect moment has not come. Let’s make a bridge to the real one.', duration: '4 min', icon: 'MessageCircleMore', barriers: ['words', 'shame'], effort: 2, evidenceId: 'lived-experience-review' },
+  { id: 'forgot-eat', pillar: 'nourish', title: 'I forgot to eat', subtitle: 'Start where you are. No making up for it.', duration: '2 min', icon: 'Utensils', barriers: ['time-blindness', 'decision-load'], effort: 1, evidenceId: 'aadpa-lifestyle' },
+  { id: 'cant-start', pillar: 'begin', title: 'I know what to do. I still can’t begin.', subtitle: 'Knowing and starting are different jobs.', duration: '5 min', icon: 'Play', barriers: ['activation', 'decision-load'], effort: 2, evidenceId: 'lived-experience-review' },
+  { id: 'too-many-tabs', pillar: 'regulate', title: 'My brain has too many tabs open', subtitle: 'Stop solving. Reduce the number of things asking for you.', duration: '3 min', icon: 'Layers3', barriers: ['decision-load', 'sensory-load'], effort: 1, evidenceId: 'lived-experience-review' },
+  { id: 'nothing-manageable', pillar: 'nourish', title: 'Nothing sounds manageable', subtitle: 'Lower the sensory and decision load.', duration: '3 min', icon: 'Soup', barriers: ['sensory-load', 'decision-load'], effort: 1, evidenceId: 'aadpa-lifestyle' },
+  { id: 'small-mistake', pillar: 'connect', title: 'A small mistake feels enormous', subtitle: 'Separate the moment from the story your body attached to it.', duration: '4 min', icon: 'HeartHandshake', barriers: ['shame'], effort: 2, evidenceId: 'rejection-sensitivity' },
+  { id: 'lost-the-day', pillar: 'begin', title: 'I started one thing and lost the whole day', subtitle: 'Hyperfocus needs a landing—not a punishment.', duration: '4 min', icon: 'TimerReset', barriers: ['time-blindness', 'activation'], effort: 2, evidenceId: 'lived-experience-review' },
+  { id: 'out-of-sight', pillar: 'begin', title: 'If I can’t see it, it leaves my brain', subtitle: 'Make the next cue visible without turning the room into a reminder wall.', duration: '3 min', icon: 'Eye', barriers: ['time-blindness', 'decision-load'], effort: 1, evidenceId: 'lived-experience-review' },
+  { id: 'overwhelmed', pillar: 'regulate', title: 'Everything feels too loud', subtitle: 'Less input. One point of contact.', duration: '3 min', icon: 'Waves', barriers: ['sensory-load', 'decision-load'], effort: 1, evidenceId: 'lived-experience-review' },
+  { id: 'med-appetite', pillar: 'nourish', title: 'My medication changed my appetite', subtitle: 'A gentle rhythm and the right clinical support.', duration: '4 min', icon: 'Clock3', barriers: ['time-blindness', 'decision-load'], effort: 2, evidenceId: 'aadpa-lifestyle' },
+  { id: 'waiting-urgency', pillar: 'begin', title: 'I’m waiting for the pressure to arrive', subtitle: 'Borrow activation before panic has to provide it.', duration: '5 min', icon: 'Gauge', barriers: ['activation', 'time-blindness'], effort: 2, evidenceId: 'lived-experience-review' },
+  { id: 'systems-collapse', pillar: 'begin', title: 'I have a system for every system', subtitle: 'When the support structure becomes another task.', duration: '4 min', icon: 'ListChecks', barriers: ['decision-load', 'activation'], effort: 2, evidenceId: 'lived-experience-review' },
+  { id: 'look-capable', pillar: 'regulate', title: 'I’m exhausted from looking capable', subtitle: 'High functioning can still cost too much.', duration: '5 min', icon: 'BatteryLow', barriers: ['shame', 'decision-load'], effort: 2, evidenceId: 'rejection-sensitivity' },
+  { id: 'reply-late', pillar: 'connect', title: 'I left it too long to reply', subtitle: 'The shame grows while the message gets no easier.', duration: '3 min', icon: 'MessageSquareReply', barriers: ['shame', 'words'], effort: 1, evidenceId: 'rejection-sensitivity' },
+  { id: 'sensory-anchor', pillar: 'regulate', title: 'My body needs something steady to hold', subtitle: 'Try a quiet tactile anchor without claiming it will fix the feeling.', duration: '3 min', icon: 'Hand', barriers: ['sensory-load'], effort: 1, evidenceId: 'lived-experience-review' },
+  { id: 'move-reset', pillar: 'move', title: 'I need to move or change the channel', subtitle: 'No goals, pace or calories attached.', duration: '4 min', icon: 'Footprints', barriers: ['activation', 'sensory-load'], effort: 2, evidenceId: 'lived-experience-review' },
+  { id: 'wind-down', pillar: 'regulate', title: 'My brain won’t clock off', subtitle: 'Build a softer off-ramp for unfinished loops.', duration: '5 min', icon: 'Moon', barriers: ['sensory-load', 'decision-load'], effort: 2, evidenceId: 'lived-experience-review' },
+  { id: 'research', pillar: 'understand', title: 'I want the research without the wellness hype', subtitle: 'What we know, what is preliminary, and who to ask.', duration: '6 min', icon: 'BookOpen', barriers: ['decision-load'], effort: 3, evidenceId: 'gow-nutrition' },
 ]
 
 export const toolDetails = {

@@ -60,6 +60,7 @@ import { formatTime, getNextMoment, useAnchorStore } from './store'
 import { localId } from './store'
 import { MomentFinder } from './MomentFinder'
 import { clearAnchorState, loadAnchorState } from '@/lib/anchor/storage'
+import { barrierLabels } from '@/lib/anchor/taxonomy'
 
 const iconMap = { BatteryLow, BookOpen, Clock3, Eye, Footprints, Gauge, Hand, HeartHandshake, Layers3, ListChecks, MessageCircleMore, MessageSquareReply, Moon, Play, Soup, TimerReset, Utensils, Waves }
 const navItems = [
@@ -69,6 +70,66 @@ const navItems = [
   { id: 'checkin', label: 'Check in', icon: HeartPulse },
   { id: 'more', label: 'More', icon: Menu },
 ]
+
+// Reads the most recent check-in and turns it into a pillar + barrier focus, so Today can
+// say plainly why it is showing what it is showing. This is deliberately a small, fixed
+// set of rules — the same "explainable, not generated" standard the moment finder holds
+// itself to — not a model guessing at what the person needs.
+const CHECKIN_FOCUS_RULES = [
+  { test: (c) => c.fuel === 'Not yet' || c.body === 'Clearly hungry', pillar: 'nourish', barrier: 'decision-load', note: 'not eaten yet' },
+  { test: (c) => c.pattern === 'Sensory overload', pillar: 'regulate', barrier: 'sensory-load', note: 'sensory overload' },
+  { test: (c) => c.brain === 'Foggy' || c.brain === 'Low', pillar: 'regulate', barrier: 'decision-load', note: 'foggy' },
+  { test: (c) => c.pattern === 'Task stuck', pillar: 'begin', barrier: 'activation', note: 'stuck on a task' },
+  { test: (c) => c.pattern === 'Lost in focus', pillar: 'begin', barrier: 'time-blindness', note: 'lost in focus' },
+  { test: (c) => c.pattern === 'Reply shame' || c.pattern === 'Conversation loop', pillar: 'connect', barrier: 'shame', note: 'a conversation that keeps circling' },
+  { test: (c) => c.pattern === 'Eating slipped away', pillar: 'nourish', barrier: 'time-blindness', note: 'eating slipping away' },
+  { test: (c) => c.brain === 'Wired', pillar: 'regulate', barrier: 'sensory-load', note: 'wired' },
+]
+
+function checkinFocus(checkin) {
+  if (!checkin) return null
+  for (const rule of CHECKIN_FOCUS_RULES) {
+    if (rule.test(checkin)) return { pillar: rule.pillar, barrier: rule.barrier, note: rule.note }
+  }
+  return null
+}
+
+function EffortDots({ level }) {
+  return (
+    <span className="effort-dots" role="img" aria-label={`Effort: ${level} of 3`}>
+      {[1, 2, 3].map((step) => <i key={step} className={step <= level ? 'on' : ''} />)}
+    </span>
+  )
+}
+
+function EvidenceBadge({ evidenceId, onOpen }) {
+  const note = evidenceNotes.find((item) => item.id === evidenceId)
+  if (!note) return null
+  return (
+    <button
+      type="button"
+      className="evidence-badge"
+      onClick={(event) => { event.stopPropagation(); onOpen(evidenceId) }}
+      aria-label={`See the evidence behind this: ${note.title}`}
+    >
+      <ShieldCheck size={12} /> Cited
+    </button>
+  )
+}
+
+function StimSwitch({ on, onToggle }) {
+  return (
+    <div className="stim-switch">
+      <span id="stim-switch-label">
+        <strong>Low-stimulation mode</strong>
+        <small>Muted colour, no motion — same content.</small>
+      </span>
+      <button type="button" role="switch" aria-checked={on} aria-labelledby="stim-switch-label" className={`switch-track ${on ? 'on' : ''}`} onClick={onToggle}>
+        <span className="switch-knob" />
+      </button>
+    </div>
+  )
+}
 
 function Brand() {
   return (
@@ -191,16 +252,19 @@ function PillarPill({ pillar, active, onClick }) {
   )
 }
 
-function PathCard({ item, favourite, onOpen, onFavourite }) {
+function PathCard({ item, favourite, onOpen, onFavourite, onEvidence }) {
   const Icon = iconMap[item.icon] || Sparkles
   const pillar = pillars.find((entry) => entry.id === item.pillar)
   return (
     <article className="path-card" data-tone={pillar?.tone}>
       <div className="path-card-top">
         <span className="path-icon"><Icon size={22} /></span>
-        <button className="icon-button" aria-label={favourite ? `Remove ${item.title} from favourites` : `Save ${item.title}`} onClick={() => onFavourite(item.id)}>
-          <Heart size={18} fill={favourite ? 'currentColor' : 'none'} />
-        </button>
+        <div className="path-card-top-actions">
+          {item.effort && <EffortDots level={item.effort} />}
+          <button className="icon-button" aria-label={favourite ? `Remove ${item.title} from favourites` : `Save ${item.title}`} onClick={() => onFavourite(item.id)}>
+            <Heart size={18} fill={favourite ? 'currentColor' : 'none'} />
+          </button>
+        </div>
       </div>
       <button className="card-button" onClick={() => onOpen(item.id)}>
         <span className="card-pillar">{pillar?.label} · {item.duration}</span>
@@ -208,6 +272,7 @@ function PathCard({ item, favourite, onOpen, onFavourite }) {
         <span>{item.subtitle}</span>
         <span className="card-link">Open <ChevronRight size={16} /></span>
       </button>
+      {item.evidenceId && <EvidenceBadge evidenceId={item.evidenceId} onOpen={onEvidence} />}
     </article>
   )
 }
@@ -226,7 +291,7 @@ function NextMoment({ rhythm, onPlan }) {
   )
 }
 
-function Today({ state, onOpen, onNavigate }) {
+function Today({ state, onOpen, onNavigate, onToggleLowStim }) {
   const hour = new Date().getHours()
   const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening'
   const favouritePaths = rightNowPaths.filter((item) => state.favourites.includes(item.id)).slice(0, 3)
@@ -237,13 +302,33 @@ function Today({ state, onOpen, onNavigate }) {
     return Math.abs(target - now) <= 120
   })()
 
+  const lastCheckin = state.checkins[state.checkins.length - 1]
+  const focus = checkinFocus(lastCheckin)
+  const focusPillarLabel = focus && pillars.find((item) => item.id === focus.pillar)?.label
+  // Meet-the-day grid: when a check-in gives a clear focus, bring matching moments to the
+  // front without hiding the rest — nothing disappears, the order just responds.
+  const meetTheDay = focus
+    ? [...rightNowPaths].sort((a, b) => (b.pillar === focus.pillar) - (a.pillar === focus.pillar)).slice(0, 8)
+    : rightNowPaths.slice(0, 8)
+
   return (
     <div className="view-stack">
       <section className="welcome-block">
         <p className="eyebrow">{greeting}{state.name ? `, ${state.name}` : ''}</p>
         <h1>What would help right now?</h1>
         <p className="lead">No perfect plan. Just one place to begin.</p>
+        <StimSwitch on={state.settings.lowStimulation} onToggle={onToggleLowStim} />
       </section>
+
+      {focus && (
+        <div className="responsive-note">
+          <Sparkles size={18} />
+          <p>
+            <strong>Since your last check-in</strong> mentioned {focus.note}, {focusPillarLabel?.toLowerCase()} moments are first below — everything else is still one tap away in{' '}
+            <button className="text-button inline" onClick={() => onNavigate('explore')}>Explore</button>.
+          </p>
+        </div>
+      )}
 
       <MomentFinder />
 
@@ -281,13 +366,14 @@ function Today({ state, onOpen, onNavigate }) {
           <button className="text-button" onClick={() => onNavigate('explore')}>See all</button>
         </div>
         <div className="right-now-grid">
-          {rightNowPaths.slice(0, 8).map((item) => {
+          {meetTheDay.map((item) => {
             const Icon = iconMap[item.icon] || Sparkles
             const tone = pillars.find((pillar) => pillar.id === item.pillar)?.tone
             return (
               <button key={item.id} className="right-now-button" data-tone={tone} onClick={() => onOpen(item.id)}>
                 <Icon size={20} />
                 <span>{item.title}</span>
+                {item.effort && <EffortDots level={item.effort} />}
                 <ChevronRight size={16} />
               </button>
             )
@@ -423,13 +509,15 @@ function ConnectionDeck() {
   )
 }
 
-function Explore({ state, onOpen, onFavourite, onToggleFuel, onToggleMeal }) {
-  const [activePillar, setActivePillar] = useState('all')
+function Explore({ state, onOpen, onFavourite, onToggleFuel, onToggleMeal, onEvidence, activePillar, onPillarChange }) {
+  const [activeBarrier, setActiveBarrier] = useState('all')
   const [query, setQuery] = useState('')
+  const barrierIds = Object.keys(barrierLabels)
   const visiblePaths = rightNowPaths.filter((item) => {
     const matchesPillar = activePillar === 'all' || item.pillar === activePillar
+    const matchesBarrier = activeBarrier === 'all' || (item.barriers || []).includes(activeBarrier)
     const haystack = `${item.title} ${item.subtitle} ${item.pillar}`.toLowerCase()
-    return matchesPillar && haystack.includes(query.trim().toLowerCase())
+    return matchesPillar && matchesBarrier && haystack.includes(query.trim().toLowerCase())
   })
 
   return (
@@ -441,10 +529,19 @@ function Explore({ state, onOpen, onFavourite, onToggleFuel, onToggleMeal }) {
       </section>
       <label className="search-field"><Search size={19} /><span className="sr-only">Search Anchor</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search a feeling, barrier or tool" /></label>
       <div className="pillar-row" aria-label="Filter by support type">
-        <button className={`pillar-pill ${activePillar === 'all' ? 'active' : ''}`} onClick={() => setActivePillar('all')}>Everything</button>
-        {pillars.map((pillar) => <PillarPill key={pillar.id} pillar={pillar} active={activePillar === pillar.id} onClick={() => setActivePillar(pillar.id)} />)}
+        <button className={`pillar-pill ${activePillar === 'all' ? 'active' : ''}`} onClick={() => onPillarChange('all')}>Everything</button>
+        {pillars.map((pillar) => <PillarPill key={pillar.id} pillar={pillar} active={activePillar === pillar.id} onClick={() => onPillarChange(pillar.id)} />)}
       </div>
-      {visiblePaths.length ? <div className="path-grid">{visiblePaths.map((item) => <PathCard key={item.id} item={item} favourite={state.favourites.includes(item.id)} onOpen={onOpen} onFavourite={onFavourite} />)}</div> : <div className="empty-state"><Leaf /><h2>No exact match</h2><p>Try a shorter word, or choose Everything.</p></div>}
+      <div className="barrier-row" aria-label="Filter by what is in the way">
+        <span className="barrier-row-label">Feeling stuck on&hellip;</span>
+        <button className={`chip-barrier ${activeBarrier === 'all' ? 'active' : ''}`} onClick={() => setActiveBarrier('all')}>Anything</button>
+        {barrierIds.map((id) => (
+          <button key={id} className={`chip-barrier ${activeBarrier === id ? 'active' : ''}`} aria-pressed={activeBarrier === id} onClick={() => setActiveBarrier(activeBarrier === id ? 'all' : id)} title={barrierLabels[id].description}>
+            {barrierLabels[id].label}
+          </button>
+        ))}
+      </div>
+      {visiblePaths.length ? <div className="path-grid">{visiblePaths.map((item) => <PathCard key={item.id} item={item} favourite={state.favourites.includes(item.id)} onOpen={onOpen} onFavourite={onFavourite} onEvidence={onEvidence} />)}</div> : <div className="empty-state"><Leaf /><h2>No exact match</h2><p>Try a shorter word, or choose Everything.</p></div>}
 
       {(activePillar === 'all' || activePillar === 'nourish') && !query && <NutritionCampaignRail onOpen={onOpen} />}
 
@@ -476,7 +573,7 @@ function Explore({ state, onOpen, onFavourite, onToggleFuel, onToggleMeal }) {
   )
 }
 
-function Plan({ state, update, onToggleFuel, onToggleMeal, onOpen }) {
+function Plan({ state, update, onToggleFuel, onToggleMeal, onOpen, onGoToPillar }) {
   const savedFuels = fuelIdeas.filter((idea) => state.savedFuelIds.includes(idea.id))
   const savedMeals = mealCards.filter((meal) => state.savedMealIds.includes(meal.id))
   function updateRhythm(id, patch) {
@@ -488,6 +585,22 @@ function Plan({ state, update, onToggleFuel, onToggleMeal, onOpen }) {
   return (
     <div className="view-stack">
       <section className="page-intro"><p className="eyebrow">A scaffold, not a scorecard</p><h1>My plan</h1><p className="lead">Shape Anchor around your actual day. You can change any of it.</p></section>
+
+      <section className="settings-card">
+        <div className="settings-heading"><div><p className="eyebrow">Your day, gently shaped</p><h2>Every pillar, not just eating</h2></div><Compass /></div>
+        <p>The eating rhythm below already works this way—opportunities placed around your day, nothing breaking if one is missed. This is the same idea, across all six pillars: how many saved starting points you have in each, so far.</p>
+        <div className="pillar-strip">
+          {pillars.map((pillar) => {
+            const count = rightNowPaths.filter((path) => path.pillar === pillar.id && state.favourites.includes(path.id)).length
+            return (
+              <button key={pillar.id} className="pillar-strip-item" data-tone={pillar.tone} data-filled={count > 0} onClick={() => onGoToPillar(pillar.id)}>
+                <strong>{pillar.label}</strong>
+                <span>{count > 0 ? `${count} saved` : 'Add one'}</span>
+              </button>
+            )
+          })}
+        </div>
+      </section>
 
       <section className="settings-card">
         <div className="settings-heading"><div><p className="eyebrow">Just one thing</p><h2>What is the next visible step?</h2></div><Sparkles /></div>
@@ -594,8 +707,15 @@ function ChoiceGroup({ label, help, value, onChange, options }) {
   )
 }
 
-function More({ state, reset }) {
+function More({ state, reset, highlightEvidenceId }) {
   const [confirmReset, setConfirmReset] = useState(false)
+  useEffect(() => {
+    if (!highlightEvidenceId) return
+    const frame = window.requestAnimationFrame(() => {
+      document.getElementById(`evidence-${highlightEvidenceId}`)?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    })
+    return () => window.cancelAnimationFrame(frame)
+  }, [highlightEvidenceId])
   function exportData() {
     const blob = new Blob([JSON.stringify({ exportedAt: new Date().toISOString(), product: state, recommendations: loadAnchorState() }, null, 2)], { type: 'application/json' })
     const link = document.createElement('a')
@@ -622,7 +742,7 @@ function More({ state, reset }) {
 
       <section>
         <div className="section-heading"><div><p className="eyebrow">Evidence register</p><h2>What this release is built on</h2></div></div>
-        <div className="evidence-list">{evidenceNotes.map((note) => <article key={note.id}><span className="evidence-status">{note.status}</span><p className="eyebrow">{note.label}</p><h3>{note.title}</h3><p>{note.summary}</p><footer><span>Reviewed {note.reviewed}</span><a href={note.url} target="_blank" rel="noreferrer">{note.source} <ExternalLink size={14} /></a></footer></article>)}</div>
+        <div className="evidence-list">{evidenceNotes.map((note) => <article key={note.id} id={`evidence-${note.id}`} className={highlightEvidenceId === note.id ? 'highlighted' : ''}><span className="evidence-status">{note.status}</span><p className="eyebrow">{note.label}</p><h3>{note.title}</h3><p>{note.summary}</p><footer><span>Reviewed {note.reviewed}</span><a href={note.url} target="_blank" rel="noreferrer">{note.source} <ExternalLink size={14} /></a></footer></article>)}</div>
       </section>
 
       <section className="lived-method-card">
@@ -741,7 +861,9 @@ function ConfirmDialog({ title, body, confirm, onCancel, onConfirm }) {
 }
 
 export default function App() {
-  const { state, hydrated, update, toggleFavourite, toggleFuel, toggleMeal, addCheckin, completeProgram, reset } = useAnchorStore()
+  const { state, hydrated, update, toggleFavourite, toggleFuel, toggleMeal, addCheckin, completeProgram, toggleLowStimulation, reset } = useAnchorStore()
+  const [explorePillar, setExplorePillar] = useState('all')
+  const [highlightEvidenceId, setHighlightEvidenceId] = useState(null)
   const initialCampaign = () => {
     if (typeof window === 'undefined') return null
     const hashMoment = new URLSearchParams(window.location.hash.replace(/^#/, '')).get('moment')
@@ -760,6 +882,8 @@ export default function App() {
   if (!state.onboarded) return <Onboarding onFinish={(name) => update({ name, onboarded: true })} />
 
   function navigate(next) { setTab(next); window.scrollTo({ top: 0, behavior: 'smooth' }) }
+  function goToPillar(pillarId) { setExplorePillar(pillarId); navigate('explore') }
+  function openEvidence(evidenceId) { setHighlightEvidenceId(evidenceId); navigate('more') }
   function handleAction(cta) {
     if (cta.action === 'complete-program') { completeProgram(cta.id); return }
     const programMap = {
@@ -782,15 +906,15 @@ export default function App() {
   }
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell ${state.settings.lowStimulation ? 'low-stim' : ''}`}>
       <Header />
       <Navigation active={tab} onChange={navigate} />
       <main id="main-content" className="content-shell">
-        {tab === 'today' && <Today state={state} onOpen={setActiveTool} onNavigate={navigate} />}
-        {tab === 'explore' && <Explore state={state} onOpen={setActiveTool} onFavourite={toggleFavourite} onToggleFuel={toggleFuel} onToggleMeal={toggleMeal} />}
-        {tab === 'plan' && <Plan state={state} update={update} onToggleFuel={toggleFuel} onToggleMeal={toggleMeal} onOpen={setActiveTool} />}
+        {tab === 'today' && <Today state={state} onOpen={setActiveTool} onNavigate={navigate} onToggleLowStim={toggleLowStimulation} />}
+        {tab === 'explore' && <Explore state={state} onOpen={setActiveTool} onFavourite={toggleFavourite} onToggleFuel={toggleFuel} onToggleMeal={toggleMeal} onEvidence={openEvidence} activePillar={explorePillar} onPillarChange={setExplorePillar} />}
+        {tab === 'plan' && <Plan state={state} update={update} onToggleFuel={toggleFuel} onToggleMeal={toggleMeal} onOpen={setActiveTool} onGoToPillar={goToPillar} />}
         {tab === 'checkin' && <CheckIn state={state} addCheckin={addCheckin} />}
-        {tab === 'more' && <More state={state} reset={reset} />}
+        {tab === 'more' && <More state={state} reset={reset} highlightEvidenceId={highlightEvidenceId} />}
       </main>
       {activeTool && <ToolModal toolId={activeTool} onClose={() => setActiveTool(null)} onAction={handleAction} favourite={state.favourites.includes(activeTool)} onFavourite={toggleFavourite} savedMeal={state.savedMealIds.includes(activeTool.replace('meal:', ''))} onToggleMeal={toggleMeal} />}
     </div>
