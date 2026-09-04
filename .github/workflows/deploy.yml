@@ -194,4 +194,11 @@ jobs:
         # tests/deployed-asset-check.test.mjs can prove it FAILS on the exact deploy that
         # shipped on 2026-08-23: page renders, /api/health perfect, every asset 503. A
         # gate nobody has watched fail is a gate nobody should trust.
+        #
+        # It retries on a fixed schedule (see checkDeployedAssetsWithRetry) because Deploy
+        # Anchor #10 (2026-09-04) proved the opposite failure mode also exists: a genuinely
+        # healthy deploy whose very first check landed on a Cloudflare edge that had not
+        # yet caught up and briefly served the previous deploy's asset references. A
+        # single fetch cannot tell that apart from a real break; several fetches a few
+        # seconds apart can.
         run: node scripts/deployed-asset-check.mjs

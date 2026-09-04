@@ -83,6 +83,35 @@ export async function checkDeployedAssets(base, { fetchImpl = fetch, timeoutMs =
   };
 }
 
+// WHY THIS RETRIES
+// ----------------
+// Deploy Anchor #10, on 2026-09-04, deployed a genuinely working release and then failed
+// this check anyway: the very first fetch, moments after `wrangler deploy` returned, hit
+// a Cloudflare edge that still had the previous deploy's index.html cached, referencing
+// asset hashes the new deploy had already replaced - a transient propagation race, not a
+// broken deploy. Minutes later every asset the live page referenced served 200. A single
+// fetch immediately after deploy cannot tell "broken" from "not yet propagated" apart, so
+// this retries on a fixed schedule and only fails once every attempt has agreed.
+//
+// This mirrors the retry loop the "Public health check" step above already uses for the
+// exact same class of just-deployed-edge-not-settled-yet race.
+export async function checkDeployedAssetsWithRetry(
+  base,
+  { attempts = 6, delayMs = 10000, sleepImpl = (ms) => new Promise((resolve) => setTimeout(resolve, ms)), ...options } = {},
+) {
+  let last;
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    last = await checkDeployedAssets(base, options);
+    if (last.ok) {
+      return { ...last, attempts: attempt };
+    }
+    if (attempt < attempts) {
+      await sleepImpl(delayMs);
+    }
+  }
+  return { ...last, attempts };
+}
+
 // CLI entry. Only runs when this file is executed directly, never when imported by a test.
 if (process.argv[1] && import.meta.url === `file://${process.argv[1]}`) {
   const base = process.env.DEPLOYMENT_URL;
@@ -91,7 +120,7 @@ if (process.argv[1] && import.meta.url === `file://${process.argv[1]}`) {
     process.exit(1);
   }
 
-  const result = await checkDeployedAssets(base);
+  const result = await checkDeployedAssetsWithRetry(base);
 
   for (const asset of result.checked) {
     if (asset.status === 200) {
@@ -102,9 +131,14 @@ if (process.argv[1] && import.meta.url === `file://${process.argv[1]}`) {
   }
 
   if (!result.ok) {
-    console.error(`::error::The deployed page cannot load its own assets. ${result.reason}`);
+    console.error(
+      `::error::The deployed page cannot load its own assets after ${result.attempts} attempt(s). ${result.reason}`,
+    );
     process.exit(1);
   }
 
-  console.log(`Every one of the ${result.checked.length} asset(s) referenced by the rendered page served 200.`);
+  console.log(
+    `Every one of the ${result.checked.length} asset(s) referenced by the rendered page served 200` +
+      (result.attempts > 1 ? ` (converged after ${result.attempts} attempts).` : "."),
+  );
 }

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createServer } from "node:http";
 
-import { checkDeployedAssets, extractAssetPaths } from "../scripts/deployed-asset-check.mjs";
+import { checkDeployedAssets, checkDeployedAssetsWithRetry, extractAssetPaths } from "../scripts/deployed-asset-check.mjs";
 
 // THE SELF-CHECK FOR THE DEPLOY GATE
 // ----------------------------------
@@ -126,6 +126,66 @@ test("it fails when the page itself does not load", async () => {
     const result = await checkDeployedAssets(base);
     assert.equal(result.ok, false);
     assert.match(result.reason, /page itself returned HTTP 500/);
+  } finally {
+    await close();
+  }
+});
+
+// THE RACE FROM DEPLOY ANCHOR #10 (2026-09-04): the deploy was genuinely fine, but the
+// very first check landed on a Cloudflare edge that hadn't caught up yet and briefly
+// served a stale index.html referencing since-replaced asset hashes. The retry wrapper
+// exists to ride out exactly that window instead of failing a healthy deploy.
+test("checkDeployedAssetsWithRetry rides out a transient propagation race and then passes", async () => {
+  let requestCount = 0;
+  const { base, close } = await serve((request, reply) => {
+    requestCount += 1;
+    // First two full passes (page + 2 assets = up to 6 requests) see a broken edge;
+    // from the third pass on, the edge has settled.
+    const settled = requestCount > 4;
+    if (request.url === "/") return respond(reply, 200, PAGE);
+    return settled ? respond(reply, 200, "/* asset */", "text/plain") : respond(reply, 503, "not yet", "text/plain");
+  });
+
+  const sleeps = [];
+  try {
+    const result = await checkDeployedAssetsWithRetry(base, {
+      attempts: 6,
+      delayMs: 1, // real delay is irrelevant here - this test only proves the retry loop itself
+      sleepImpl: async (ms) => {
+        sleeps.push(ms);
+      },
+    });
+    assert.equal(result.ok, true, result.reason);
+    assert.ok(result.attempts > 1, "expected the first attempt(s) to fail before it converged");
+    assert.ok(sleeps.length > 0, "expected it to actually wait between attempts");
+  } finally {
+    await close();
+  }
+});
+
+// If the edge never settles, this must still fail loudly rather than retry forever or
+// silently give up - same "a checker that checks nothing is worse than no checker"
+// principle the rest of this file is built around.
+test("checkDeployedAssetsWithRetry fails after exhausting every attempt on a deploy that never recovers", async () => {
+  const { base, close } = await serve((request, reply) => {
+    if (request.url === "/") return respond(reply, 200, PAGE);
+    return respond(reply, 503, "Service Unavailable", "text/plain");
+  });
+
+  const sleeps = [];
+  try {
+    const result = await checkDeployedAssetsWithRetry(base, {
+      attempts: 3,
+      delayMs: 1,
+      sleepImpl: async (ms) => {
+        sleeps.push(ms);
+      },
+    });
+    assert.equal(result.ok, false, "a deploy that never recovers must not eventually pass");
+    assert.equal(result.attempts, 3);
+    assert.match(result.reason, /did not serve 200/);
+    // 3 attempts means 2 waits in between, never a wait after the final attempt.
+    assert.equal(sleeps.length, 2);
   } finally {
     await close();
   }
