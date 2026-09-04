@@ -59,6 +59,7 @@
   "displayName": "Anchor v7 Ecosystem Integration",
   "overrides": {
     "postcss": "8.5.25",
-    "sharp": "0.35.3"
+    "sharp": "0.35.3",
+    "esbuild": "0.25.12"
   }
 }
